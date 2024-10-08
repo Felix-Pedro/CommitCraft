@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "commitcraft"
+version = "0.1.0"
+description = "A simple tool to use LLM and git diff to craft meaningfull commit messages."
+authors = ["Felix-Pedro <felix@auneria.com>"]
+license = "AGPL-3.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+GitPython = "^3.1.43"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
