@@ -56,12 +56,13 @@ def commit_craft(diff : str,
             - Avoid unecessary details and long explanations.
             - Use action verbs.
             - Use bullet points in the body if there are many changes
+            - Do not talk about the hashes
             {context_info.get("commit_guidelies", default.get("commit_guidelines"))}
             {context_info.get("emoji", default.get("emoji"))}
             '''
     match provider:
         case "ollama":
             import ollama
-            return ollama.generate(model=model, system=system_prompt, prompt=diff, options={'num_ctx' : 32768})['response']
+            return ollama.generate(model=model, system=system_prompt, prompt=diff, options={'num_ctx' : 49152})['response']
         case _:
             raise NotImplementedError("provider not found")
