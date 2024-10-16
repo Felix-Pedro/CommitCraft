@@ -4,7 +4,7 @@ default={
     of what has changed and how it may afect the rest of the project. Do not return any explanation other then the commit message itself.
     ''',
     'emoji' :'''
-    Chose one of the folowing emoji to start you message, use just the emoji, and only if the description applies to the diff, you should then describe the changes:
+    Chose one of the folowing emoji to start you message, use just the emoji, and only if the description applies to the diff, you should then describe the changes, use the format "emoji commit message title \n rest of the message":
         🎨 ; Improve structure / format of the code.
         ⚡️ ; Improve performance.
         🔥 ; Remove code or files.
