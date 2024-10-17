@@ -33,7 +33,7 @@ def get_repo_details(owner, repo):
     commits_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/commits"
     commits_data = requests.get(commits_url, headers=headers).json()[:100]
 
-    # Randomly select 3 commits from the last 10
+    # Randomly select 3 commits from the last 100
     selected_commits = random.sample(commits_data, 3)
 
     commits = []
@@ -64,7 +64,7 @@ def save_to_csv(data, filename="./promptfoo-tests/test_repos_data.csv"):
     """Save all project details and commits to a CSV file."""
     with open(filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow(["Repo Name", "Language", "Description", "Commit Number", "Commit Message", "Commit SHA", "Diff"])
+        writer.writerow(["name", "language", "description", "commit number", "commit message", "Commit SHA", "diff"])
 
         for language_data in data.values():
             for repo in language_data:
@@ -98,5 +98,5 @@ def process_popular_languages(languages):
     save_to_csv(all_data)
 
 if __name__ == "__main__":
-    # Process the 7 most popular languages and get 5 repositories for each
+    # Process the 15 most popular languages and get 5 repositories and 3 commits for each
     process_popular_languages(POPULAR_LANGUAGES)

@@ -1,0 +1,102 @@
+# Learn more about building a configuration: https://promptfoo.dev/docs/configuration/guide
+description: "Testing CommitCraft Capabilities in multiple popular repositories"
+
+prompts:
+  - file://prompt1.json
+  - file://prompt2.json
+
+providers:
+  - id: "ollama:completion:gemma2"
+    config:
+      num_ctx: 49152
+
+defaultTest:
+  assert:
+    # Prefer shorter outputs
+    - type: python
+      value: len(output) < 512
+    - type: not-icontains-any
+      value: 
+        - "questions"
+        - "ask"
+        - "feel free"
+        - "I am"
+        - "as an ai"
+        - "provided diff"
+    - type: contains-any
+      value:
+        - "🎨"
+        - "⚡️"
+        - "🔥"
+        - "🐛"
+        - "🚑️"
+        - "✨"
+        - "📝"
+        - "🚀"
+        - "💄"
+        - "🎉"
+        - "✅"
+        - "🔒️"
+        - "🔐"
+        - "🔖"
+        - "🚨"
+        - "🚧"
+        - "💚"
+        - "⬇️"
+        - "⬆️"
+        - "📌"
+        - "👷"
+        - "📈"
+        - "♻️"
+        - "➕"
+        - "➖"
+        - "🔧"
+        - "🔨"
+        - "🌐"
+        - "✏️"
+        - "💩"
+        - "️⏪️"
+        - "🔀"
+        - "📦️"
+        - "👽️"
+        - "🚚"
+        - "📄"
+        - "💥"
+        - "🍱"
+        - "♿️"
+        - "💡"
+        - "🍻"
+        - "💬"
+        - "🗃️"
+        - "🔊"
+        - "🔇"
+        - "👥"
+        - "🚸"
+        - "🏗️"
+        - "📱"
+        - "🤡"
+        - "🥚"
+        - "🙈"
+        - "📸"
+        - "⚗️"
+        - "🔍️"
+        - "🏷️"
+        - "🌱"
+        - "🚩"
+        - "🥅"
+        - "💫"
+        - "🗑️"
+        - "🛂"
+        - "🩹"
+        - "🧐"
+        - "⚰️"
+        - "🧪"
+        - "👔"
+        - "🩺"
+        - "🧱"
+        - "🧑‍💻"
+        - "💸"
+        - "🧵"
+        - "🦺"
+
+tests: file://../test_repos_data.csv
