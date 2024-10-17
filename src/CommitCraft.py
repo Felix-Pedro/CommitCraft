@@ -10,8 +10,10 @@ def get_diff() -> str:
 
 def get_context_size(diff, system):
     input_len = len(system) + len(diff)
-    return min(max(input_len*1.5, 1024), 128000)
-    
+    num_ctx = int(min(max(input_len*2.64, 1024), 128000))
+    # print('context size:', num_ctx)
+    return num_ctx
+
 
 def commit_craft(diff : str,
                 provider : str='ollama',
