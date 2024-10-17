@@ -18,7 +18,7 @@ def main():
     else:
         context = None
 
-    return commit_craft(diff, context=context)
+    return commit_craft(diff, context=context)['response']
 if __name__ == '__main__':
     print(main())
     

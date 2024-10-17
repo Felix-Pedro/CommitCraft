@@ -8,13 +8,19 @@ def get_diff() -> str:
     diff = subprocess.run(['git', 'diff', '--staged', '-M'], capture_output=True, text=True)
     return diff.stdout
 
+def get_context_size(diff, system):
+    input_len = len(system) + len(diff)
+    return min(max(input_len*1.5, 1024), 128000)
+    
+
 def commit_craft(diff : str,
                 provider : str='ollama',
                 model : str='llama3.1',
                 provider_url : str | None=None,
                 context : str | None=None,
                 system_prompt : str | None=None,
-                user_prompt : str | None=None) -> str:
+                user_prompt : str | None=None,
+                model_options : dict | None=None) -> str:
     context_info = context
     if context:
         context = context.strip()
@@ -63,6 +69,13 @@ def commit_craft(diff : str,
     match provider:
         case "ollama":
             import ollama
-            return ollama.generate(model=model, system=system_prompt, prompt=diff, options={'num_ctx' : 49152})['response']
+            if model_options:
+                if 'num_ctx' in model_options.keys():
+                    return ollama.generate(model=model, system=system_prompt, prompt=diff, options=model_options)
+                else:
+                    model_options['num_ctx'] = get_context_size(diff, system_prompt)
+                    return ollama.generate(model=model, system=system_prompt, prompt=diff, options=model_options)
+            else:
+                return ollama.generate(model=model, system=system_prompt, prompt=diff, options={'num_ctx' : get_context_size(diff, system_prompt)})
         case _:
             raise NotImplementedError("provider not found")
