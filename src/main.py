@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from CommitCraft import commit_craft, get_diff
+from CommitCraft import commit_craft, get_diff, CommitCraftRequest
 import argparse
 
 load_dotenv()
@@ -17,8 +17,7 @@ def main():
         context = 'file:./.commitcraft/context.json'
     else:
         context = None
-
-    return commit_craft(diff, context=context)['response']
+    request = CommitCraftRequest(diff=diff, context=context)
+    return commit_craft(request)['response']
 if __name__ == '__main__':
     print(main())
-    
