@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from CommitCraft import commit_craft, get_diff, CommitCraftRequest
+from commitcraft import commit_craft, get_diff, CommitCraftRequest
 import argparse
 
 load_dotenv()
