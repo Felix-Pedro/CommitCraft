@@ -2,7 +2,7 @@ from ast import Raise
 import subprocess
 
 from requests.api import options
-from defaults import default
+from .defaults import default
 from enum import Enum
 from pydantic import BaseModel, Field, conint, Extra
 from typing import Optional, Dict, Union
@@ -13,7 +13,7 @@ def get_diff() -> str:
 
 def get_context_size(diff, system):
     input_len = len(system) + len(diff)
-    num_ctx = int(min(max(input_len*2.64, 1024), 65536))
+    num_ctx = int(min(max(input_len*2.64, 1024), 128000))
     return num_ctx
 
 # Define the Emoji Enum
@@ -88,7 +88,7 @@ def commit_craft(request: CommitCraftRequest) -> str:
             - Use action verbs.
             - Use bullet points in the body if there are many changes
             - Do not talk about the hashes
-            {context_info.get("commit_guidelies", default.get("commit_guidelines"))}
+            {context_info.get("guidelines", default.get("guidelines"))}
             {context_info.get("emoji", default.get("emoji"))}
             '''
     else:
