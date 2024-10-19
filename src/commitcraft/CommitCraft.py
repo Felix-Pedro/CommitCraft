@@ -201,5 +201,13 @@ Your only task is to recive a git diff and return a simple commit message folowi
                 stream=False,
                 **groq_options
             ).choices[0].message.content
+        case 'google':
+            import google.generativeai as genai
+            genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+            model=genai.GenerativeModel(
+              model_name=model.model,
+              system_instruction=system_prompt)
+            return model.generate_content(request.diff).text
+
         case _:
             raise NotImplementedError("provider not found")
