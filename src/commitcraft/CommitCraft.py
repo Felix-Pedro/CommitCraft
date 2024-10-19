@@ -3,6 +3,7 @@ from .defaults import default
 from enum import Enum
 from pydantic import BaseModel, conint, Extra, root_validator, HttpUrl
 from typing import Optional
+import os
 
 class MissingModelError(ValueError):
     def __init__(self):
@@ -44,7 +45,7 @@ class Provider(str, Enum):
     google = 'google'
     groq = 'groq'
     oai_custom = 'custom_openai_compatible'
-    
+
 
 class LModel(BaseModel):
     provider: Provider = Provider.ollama
@@ -52,7 +53,7 @@ class LModel(BaseModel):
     system_prompt: Optional[str] = None
     options: Optional[LModelOptions] = None
     host: Optional[HttpUrl] = None  # required for custom_openai_compatible
-    
+
     @root_validator(pre=True)
     def set_model_default(cls, values):
         # If 'model' is not provided, set it based on 'provider'
@@ -71,25 +72,25 @@ class LModel(BaseModel):
         @root_validator(pre=True)
         def validate_provider_requirements(cls, values):
             provider = values.get('provider')
-            
+
             # Enforce that 'model' is not None when using oai_custom
             if provider == Provider.oai_custom:
                 if not values.get('model'):
                     raise MissingModelError()
-            
+
             return values
-    
+
         # Validator for checking host when using 'oai_custom' provider
         @root_validator(pre=True)
         def check_host_for_oai_custom(cls, host, values):
             provider = values.get('provider')
-            
+
             # If provider is 'oai_custom', host must be provided
             if provider == Provider.oai_custom and not host:
                 raise MissingHostError()
-            
+
             return host
-            
+
 class Context(BaseModel):
     project_name: Optional[str] = None
     project_language: Optional[str] = None
@@ -150,21 +151,54 @@ Your only task is to recive a git diff and return a simple commit message folowi
         elif emoji.emoji_convention:
             system_prompt+=f'\n\n{emoji.emoji_convention}'
     model = request.models
+    model_options = model.options.dict() if model.options else {}
     match model.provider:
         case "ollama":
             import ollama
-            if model.options:
-                model_options = model.options.dict()
-                if 'num_ctx' in model_options.keys():
-                    if model_options['num_ctx']:
-                        return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options=model_options)
-                    else:
-                        model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
-                        return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options=model_options)
+            if 'num_ctx' in model_options.keys():
+                if model_options['num_ctx']:
+                    return ollama.generate(
+                        model=model.model,
+                        system=system_prompt,
+                        prompt=request.diff,
+                        options=model_options
+                    )['response']
                 else:
                     model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
-                    return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options=model_options)
+                    return ollama.generate(
+                        model=model.model,
+                        system=system_prompt,
+                        prompt=request.diff,
+                        options=model_options
+                    )['response']
             else:
-                return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options={'num_ctx' : get_context_size(request.diff, system_prompt)})
+                model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
+                return ollama.generate(
+                    model=model.model,
+                    system=system_prompt,
+                    prompt=request.diff,
+                    options=model_options
+                )['response']
+
+        case "groq":
+            from groq import Groq
+            client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+            groq_configs = ('top_p','temperature', 'max_tokens')
+            groq_options = {config : model_options.get(config) if model_options.get(config) else None for config in (set(tuple(model_options.keys())) & set(groq_configs))}
+            return client.chat.completions.create(
+                messages=[
+                    {
+                        "role" : "system",
+                        "content" : system_prompt
+                    },
+                    {
+                        "role" : "user",
+                        "content" : request.diff
+                    }
+                ],
+                model=model.model,
+                stream=False,
+                **groq_options
+            ).choices[0].message.content
         case _:
             raise NotImplementedError("provider not found")

@@ -82,7 +82,7 @@ def main():
 
     context_info = Context(**config.get('context')) if config.get('context') else None
     emoji_config = EmojiConfig(**config.get('emoji')) if config.get('emoji') else EmojiConfig(emoji_steps='single', emoji_convention='simple')
-    model_config = LModel(**config.get('models')) if config.get('models') else LModel(provider=Provider.ollama, model='gemma2')
+    model_config = LModel(**config.get('models')) if config.get('models') else LModel()
 
 
     # Process unknown arguments as additional model options
@@ -114,7 +114,7 @@ def main():
 
     model_config = LModel(
         provider=args.provider if args.provider else model_config.provider,
-        model=args.model if args.model else model_config.model,
+        model=args.model if args.model else None,
         system_prompt=args.system_prompt if args.system_prompt else model_config.system_prompt,
         options=LModelOptions(**model_options)
     )
@@ -129,7 +129,7 @@ def main():
 
     # Call the commit_craft function and print the result
     response = commit_craft(request)
-    print(response['response'])
+    print(response)
 
 if __name__ == '__main__':
     main()
