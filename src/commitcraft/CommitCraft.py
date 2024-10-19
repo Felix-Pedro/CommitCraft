@@ -64,7 +64,7 @@ class LModel(BaseModel):
             if provider == Provider.groq:
                 values['model'] = 'llama-3.1-70b-versatile'
             elif provider == Provider.google:
-                values['model'] = ''
+                values['model'] = 'gemini-1.5-pro-exp-0827'
             elif provider == Provider.openai:
                 values['model'] = 'gpt-3'
         return values
