@@ -155,9 +155,10 @@ Your only task is to recive a git diff and return a simple commit message folowi
     match model.provider:
         case "ollama":
             import ollama
+            Ollama = ollama.Client(model.host or os.getenv("OLLAMA_HOST"))
             if 'num_ctx' in model_options.keys():
                 if model_options['num_ctx']:
-                    return ollama.generate(
+                    return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
                         prompt=request.diff,
@@ -165,7 +166,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
                     )['response']
                 else:
                     model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
-                    return ollama.generate(
+                    return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
                         prompt=request.diff,
@@ -173,7 +174,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
                     )['response']
             else:
                 model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
-                return ollama.generate(
+                return Ollama.generate(
                     model=model.model,
                     system=system_prompt,
                     prompt=request.diff,
