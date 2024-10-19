@@ -1,7 +1,6 @@
 from ast import Raise
 import subprocess
-
-from requests.api import options
+from typing_extensions import List
 from .defaults import default
 from enum import Enum
 from pydantic import BaseModel, Field, conint, Extra
@@ -17,93 +16,107 @@ def get_context_size(diff, system):
     return num_ctx
 
 # Define the Emoji Enum
-class EmojiEnum(str, Enum):
-    simple = 'simple'
-    detailed = 'detailed'
-    none = 'none'
+class EmojiSteps(Enum):
+    single = 'single'
+    step2 = '2-step'
+    false = False
 
 # Define the model_options structure with restrictions on specific keys
 class LModelOptions(BaseModel):
-    num_ctx: Optional[int] = None  # Ensure num_ctx is an int in the range or None
-    temperature: Optional[float] = Field(ge=0.0, le=1.0, default=0.7)  # Temperature should be a float between 0 and 1
+    num_ctx: Optional[int] = None
+    temperature: Optional[float] = None
     max_tokens: Optional[conint(ge=1)] = None  # Ensure max_tokens is a positive integer if provided
 
     class Config:
         extra = Extra.allow
 
-# Define a Pydantic model for validation
+class Provider(str, Enum):
+    ollama = 'ollama'
+    openai = 'openai'
+    google = 'google'
+    groq = 'groq'
+
+class LModel(BaseModel):
+    provider: Provider = Provider.ollama
+    model: str = 'gemma2'
+    system_prompt: Optional[str] = None
+    options: Optional[LModelOptions] = None
+
+class Context(BaseModel):
+    project_name: Optional[str] = None
+    project_language: Optional[str] = None
+    project_description: Optional[str] = None
+    commit_guidelines: Optional[str] = None
+
+class EmojiConfig(BaseModel):
+    emoji_steps: EmojiSteps = EmojiSteps.single
+    emoji_convention: str = "simple"
+    emoji_model: Optional[LModel] = None
+
 class CommitCraftRequest(BaseModel):
     diff: str
-    provider: str = 'ollama'
-    model: str = 'gemma2'
-    context: Optional[str] = None
-    system_prompt: Optional[str] = None
-    user_prompt: Optional[str] = None
-    lmodel_options: Optional[LModelOptions] = None  # Use the custom ModelOptions type
-    emoji: EmojiEnum = EmojiEnum.simple
+    models: LModel = LModel() # Will support multiple models in 1.1.0 but for now only one
+    emoji: EmojiConfig = EmojiConfig()
+    context: Optional[Context] = None
 
 def commit_craft(request: CommitCraftRequest) -> str:
     context_info = request.context
-    system_prompt = None
-    if request.context:
-        request.context = request.context.strip()
-        if request.context.startswith('file:'):
-            with open(request.context.lstrip('file:')) as file:
-                match request.context.split('.')[-1]:
-                    case 'toml':
-                        import toml
-                        context_info = toml.loads(file.read())
-                    case 'yml' | 'yaml':
-                        import yaml
-                        context_info = yaml.safe_load(file.read())
-                    case 'json':
-                        import json
-                        context_info = json.loads(file.read())
-                    case _:
-                        context_info = file.read()
-        else:
-            context_info=request.context
-    if request.user_prompt:
-        user_prompt = request.user_prompt.strip()
-    else:
-        user_prompt = None
-    if request.system_prompt:
-        system_prompt = request.system_prompt.strip()
-    elif context_info:
-        if isinstance(context_info, dict):
+    system_prompt = request.models.system_prompt
+    if not system_prompt and context_info:
+        if (context_info.project_name and context_info.project_language and context_info.project_description):
             system_prompt = f'''
-            # Proposure
-            You are a commit message helper for {context_info["name"]} a project written in {context_info["language"]} described as :
-            {context_info["description"]}
+# Proposure
 
-            Your only task is to recive a git diff and return a conciveble commit message folowing those gidelines:
+You are a commit message helper for {context_info.project_name} a project written in {context_info.project_language} described as :
 
-            - Never ask for folow-up qucontext_infoestions.
-            - Don't ask quetions.
-            - Don't talk about yourself.
-            - Be concise and clear.
-            - Be informative.
-            - Don't explain row by row just the global goal of the changes.
-            - Avoid unecessary details and long explanations.
-            - Use action verbs.
-            - Use bullet points in the body if there are many changes
-            - Do not talk about the hashes
-            {context_info.get("guidelines", default.get("guidelines"))}
-            {context_info.get("emoji", default.get("emoji"))}
-            '''
-    else:
-        system_prompt = None
-    match request.provider:
+{context_info.project_description}
+
+Your only task is to recive a git diff and return a simple commit message folowing these guidelines:
+
+{context_info.commit_guidelines if context_info.commit_guidelines else  default.get("commit_guidelines")}
+            '''.strip()
+        else:
+            system_prompt = f'''
+# Proposure
+
+You are a commit message helper.
+
+Your only task is to recive a git diff and return a simple commit message folowing these guidelines:
+
+{context_info.commit_guidelines if context_info.commit_guidelines else  default.get("commit_guidelines")}
+            '''.strip()
+    elif not system_prompt and not context_info:
+        system_prompt = f'''
+# Proposure
+
+You are a commit message helper.
+
+Your only task is to recive a git diff and return a simple commit message folowing these guidelines:
+
+{default.get("commit_guidelines")}
+        '''.strip()
+    emoji = request.emoji
+    if emoji.emoji_steps == EmojiSteps.single:
+        if emoji.emoji_convention in ('simple', 'full'):
+            system_prompt+=f'\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention)}'
+        elif emoji.emoji_convention:
+            system_prompt+=f'\n\n{emoji.emoji_convention}'
+    model = request.models
+    match model.provider:
         case "ollama":
             import ollama
-            if request.lmodel_options:
-                model_options = request.lmodel_options.dict()
+            if model.options:
+                model_options = model.options.dict()
                 if 'num_ctx' in model_options.keys():
-                    return ollama.generate(model=request.model, system=system_prompt, prompt=request.diff, options=model_options)
+                    if model_options['num_ctx']:
+                        return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options=model_options)
+                    else:
+                        model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
+                        return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options=model_options)
                 else:
                     model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
-                    return ollama.generate(model=request.model, system=system_prompt, prompt=request.diff, options=model_options)
+                    return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options=model_options)
             else:
-                return ollama.generate(model=request.model, system=system_prompt, prompt=request.diff, options={'num_ctx' : get_context_size(request.diff, system_prompt)})
+                return ollama.generate(model=model.model, system=system_prompt, prompt=request.diff, options={'num_ctx' : get_context_size(request.diff, system_prompt)})
         case _:
             raise NotImplementedError("provider not found")
