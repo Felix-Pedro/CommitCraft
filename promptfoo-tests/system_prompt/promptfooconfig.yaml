@@ -16,13 +16,14 @@ defaultTest:
     - type: python
       value: len(output) < 512
     - type: not-icontains-any
-      value: 
+      value:
         - "questions"
         - "ask"
         - "feel free"
         - "I am"
         - "as an ai"
         - "provided diff"
+        - "Let me"
     - type: contains-any
       value:
         - "🎨"
