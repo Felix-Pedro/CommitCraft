@@ -69,6 +69,8 @@ def main():
     parser.add_argument('--num-ctx', type=int, help="Context size for the model")
     parser.add_argument('--temperature', type=float, help="Temperature for the model")
     parser.add_argument('--max-tokens', type=int, help="Maximum number of tokens for the model")
+    parser.add_argument('--host', type=str, help="http or https host for the provider, in custom shall be the full api endpoint, not used for groq")
+
 
     # Parse known and unknown arguments
     args, unknown_args = parser.parse_known_args()
@@ -116,6 +118,7 @@ def main():
         provider=args.provider if args.provider else model_config.provider,
         model=args.model if args.model else None,
         system_prompt=args.system_prompt if args.system_prompt else model_config.system_prompt,
+        host=args.host if args.host else model_config.host,
         options=LModelOptions(**model_options)
     )
 
