@@ -1,10 +1,18 @@
-from ast import Raise
 import subprocess
-from typing_extensions import List
 from .defaults import default
 from enum import Enum
-from pydantic import BaseModel, Field, conint, Extra
-from typing import Optional, Dict, Union
+from pydantic import BaseModel, conint, Extra, root_validator, HttpUrl
+from typing import Optional
+
+class MissingModelError(ValueError):
+    def __init__(self):
+        self.message = "The model cannot be None for the 'custom_openai_compatible' provider."
+        super().__init__(self.message)
+
+class MissingHostError(ValueError):
+    def __init__(self):
+        self.message = "The 'host' field is required and must be a valid URL when using the 'custom_openai_compatible' provider."
+        super().__init__(self.message)
 
 def get_diff() -> str:
     diff = subprocess.run(['git', 'diff', '--staged', '-M'], capture_output=True, text=True)
@@ -35,13 +43,53 @@ class Provider(str, Enum):
     openai = 'openai'
     google = 'google'
     groq = 'groq'
+    oai_custom = 'custom_openai_compatible'
+    
 
 class LModel(BaseModel):
     provider: Provider = Provider.ollama
-    model: str = 'gemma2'
+    model: Optional[str] = None # Most providers have default, required for custom_openai_compatible
     system_prompt: Optional[str] = None
     options: Optional[LModelOptions] = None
+    host: Optional[HttpUrl] = None  # required for custom_openai_compatible
+    
+    @root_validator(pre=True)
+    def set_model_default(cls, values):
+        # If 'model' is not provided, set it based on 'provider'
+        provider = values.get('provider')
+        if 'model' not in values or values['model'] is None:
+            if provider == Provider.ollama:
+                values['model'] = 'gemma2'
+            if provider == Provider.groq:
+                values['model'] = 'llama-3.1-70b-versatile'
+            elif provider == Provider.google:
+                values['model'] = ''
+            elif provider == Provider.openai:
+                values['model'] = 'gpt-3'
+        return values
 
+        @root_validator(pre=True)
+        def validate_provider_requirements(cls, values):
+            provider = values.get('provider')
+            
+            # Enforce that 'model' is not None when using oai_custom
+            if provider == Provider.oai_custom:
+                if not values.get('model'):
+                    raise MissingModelError()
+            
+            return values
+    
+        # Validator for checking host when using 'oai_custom' provider
+        @root_validator(pre=True)
+        def check_host_for_oai_custom(cls, host, values):
+            provider = values.get('provider')
+            
+            # If provider is 'oai_custom', host must be provided
+            if provider == Provider.oai_custom and not host:
+                raise MissingHostError()
+            
+            return host
+            
 class Context(BaseModel):
     project_name: Optional[str] = None
     project_language: Optional[str] = None
