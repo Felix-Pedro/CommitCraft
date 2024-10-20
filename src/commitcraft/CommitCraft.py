@@ -163,7 +163,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
     match model.provider:
         case "ollama":
             import ollama
-            Ollama = ollama.Client(str(model.host) or os.getenv("OLLAMA_HOST"))
+            Ollama = ollama.Client(str(model.host) if model.host else os.getenv("OLLAMA_HOST"))
             if 'num_ctx' in model_options.keys():
                 if model_options['num_ctx']:
                     return Ollama.generate(
