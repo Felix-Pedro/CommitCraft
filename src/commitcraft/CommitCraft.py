@@ -33,7 +33,7 @@ class EmojiSteps(Enum):
     single = 'single'
     step2 = '2-step'
     false = False
- 
+
 
 class LModelOptions(BaseModel):
     """The options for the LLM"""
@@ -42,7 +42,7 @@ class LModelOptions(BaseModel):
     max_tokens: Optional[conint(ge=1)] = None  # Ensure max_tokens is a positive integer if provided
 
     class Config:
-        extra = Extra.allow # Allows for extra arguments 
+        extra = Extra.allow # Allows for extra arguments
 
 class Provider(str, Enum):
     """The supported LLM Providers"""
@@ -150,20 +150,20 @@ Your only task is to recive a git diff and return a simple commit message folowi
 
 {default.get("commit_guidelines")}
         '''.strip()
-    
+
     emoji = request.emoji
     if emoji.emoji_steps == EmojiSteps.single:
         if emoji.emoji_convention in ('simple', 'full'):
             system_prompt+=f'\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention)}'
         elif emoji.emoji_convention:
             system_prompt+=f'\n\n{emoji.emoji_convention}'
-    
+
     model = request.models
     model_options = model.options.dict() if model.options else {}
     match model.provider:
         case "ollama":
             import ollama
-            Ollama = ollama.Client(model.host or os.getenv("OLLAMA_HOST"))
+            Ollama = ollama.Client(str(model.host) or os.getenv("OLLAMA_HOST"))
             if 'num_ctx' in model_options.keys():
                 if model_options['num_ctx']:
                     return Ollama.generate(
@@ -241,7 +241,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
 
         case 'custom_openai_compatible':
             from openai import OpenAI
-            client = OpenAI(api_key=os.getenv('CUSTOM_API_KEY', default='nokey'), base_url=model.host)
+            client = OpenAI(api_key=os.getenv('CUSTOM_API_KEY', default='nokey'), base_url=str(model.host))
             openai_configs = ('top_p','temperature', 'max_tokens')
             openai_options = {config : model_options.get(config) if model_options.get(config) else None for config in (set(tuple(model_options.keys())) & set(openai_configs))}
             return client.chat.completions.create(
