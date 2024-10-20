@@ -5,6 +5,7 @@ from pydantic import BaseModel, conint, Extra, root_validator, HttpUrl
 from typing import Optional
 import os
 
+# Custom exceptions to be raised when using custom_openai_compatible provider.
 class MissingModelError(ValueError):
     def __init__(self):
         self.message = "The model cannot be None for the 'custom_openai_compatible' provider."
@@ -16,30 +17,35 @@ class MissingHostError(ValueError):
         super().__init__(self.message)
 
 def get_diff() -> str:
+    """Retrieve the staged changes in the git repository."""
     diff = subprocess.run(['git', 'diff', '--staged', '-M'], capture_output=True, text=True)
     return diff.stdout
 
-def get_context_size(diff, system):
+def get_context_size(diff : str, system : str) -> int:
+    """Based on the git diff and system prompt estimate ollama context window needed"""
     input_len = len(system) + len(diff)
     num_ctx = int(min(max(input_len*2.64, 1024), 128000))
     return num_ctx
 
-# Define the Emoji Enum
+
 class EmojiSteps(Enum):
+    """If emoji should be performed in the same step as the message or in a separe one"""
     single = 'single'
     step2 = '2-step'
     false = False
+ 
 
-# Define the model_options structure with restrictions on specific keys
 class LModelOptions(BaseModel):
+    """The options for the LLM"""
     num_ctx: Optional[int] = None
     temperature: Optional[float] = None
     max_tokens: Optional[conint(ge=1)] = None  # Ensure max_tokens is a positive integer if provided
 
     class Config:
-        extra = Extra.allow
+        extra = Extra.allow # Allows for extra arguments 
 
 class Provider(str, Enum):
+    """The supported LLM Providers"""
     ollama = 'ollama'
     openai = 'openai'
     google = 'google'
@@ -48,6 +54,7 @@ class Provider(str, Enum):
 
 
 class LModel(BaseModel):
+    """The model object containin the provider, model name, system prompt, option and host"""
     provider: Provider = Provider.ollama
     model: Optional[str] = None # Most providers have default, required for custom_openai_compatible
     system_prompt: Optional[str] = None
@@ -64,7 +71,7 @@ class LModel(BaseModel):
             if provider == Provider.groq:
                 values['model'] = 'llama-3.1-70b-versatile'
             elif provider == Provider.google:
-                values['model'] = 'gemini-1.5-pro-exp-0827'
+                values['model'] = 'gemini-1.5-pro'
             elif provider == Provider.openai:
                 values['model'] = 'gpt-3.5-turbo'
         return values
@@ -73,25 +80,23 @@ class LModel(BaseModel):
         def validate_provider_requirements(cls, values):
             provider = values.get('provider')
 
-            # Enforce that 'model' is not None when using oai_custom
+            # Enforce that 'model' is not None when using custom_openai_compatible
             if provider == Provider.oai_custom:
                 if not values.get('model'):
                     raise MissingModelError()
 
             return values
 
-        # Validator for checking host when using 'oai_custom' provider
         @root_validator(pre=True)
         def check_host_for_oai_custom(cls, host, values):
             provider = values.get('provider')
-
-            # If provider is 'oai_custom', host must be provided
             if provider == Provider.oai_custom and not host:
                 raise MissingHostError()
 
             return host
 
 class Context(BaseModel):
+    """Context object for tha commit request"""
     project_name: Optional[str] = None
     project_language: Optional[str] = None
     project_description: Optional[str] = None
@@ -109,6 +114,7 @@ class CommitCraftRequest(BaseModel):
     context: Optional[Context] = None
 
 def commit_craft(request: CommitCraftRequest) -> str:
+    """CommitCraft generates a system message and requests a commit message based on staged changes """
     context_info = request.context
     system_prompt = request.models.system_prompt
     if not system_prompt and context_info:
@@ -144,12 +150,14 @@ Your only task is to recive a git diff and return a simple commit message folowi
 
 {default.get("commit_guidelines")}
         '''.strip()
+    
     emoji = request.emoji
     if emoji.emoji_steps == EmojiSteps.single:
         if emoji.emoji_convention in ('simple', 'full'):
             system_prompt+=f'\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention)}'
         elif emoji.emoji_convention:
             system_prompt+=f'\n\n{emoji.emoji_convention}'
+    
     model = request.models
     model_options = model.options.dict() if model.options else {}
     match model.provider:
@@ -230,6 +238,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
                 stream=False,
                 **openai_options
             ).choices[0].message.content
+
         case 'custom_openai_compatible':
             from openai import OpenAI
             client = OpenAI(api_key=os.getenv('CUSTOM_API_KEY', default='nokey'), base_url=model.host)
