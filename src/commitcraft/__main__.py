@@ -59,17 +59,17 @@ def load_config():
     }
 
 def main():
-    parser = argparse.ArgumentParser(description="CommitCraft - Generate commit messages using AI.")
+    parser = argparse.ArgumentParser(description="CommitCraft - Craft better commit messages using AI.")
 
     # Command-line arguments for overriding settings
-    parser.add_argument('--provider', type=str, help="Provider for the AI model (supported are 'ollama')")
+    parser.add_argument('--provider', type=str, help="Provider for the AI model (supported values are 'ollama', 'groq', 'google', 'openai' and 'custom_openai_compatible')")
     parser.add_argument('--model', type=str, help="Model name (e.g., 'gemma2', 'llama3.1:70b')")
     parser.add_argument('--config-file', type=str, help="Path to the config file (TOML, YAML, or JSON)")
     parser.add_argument('--system-prompt', type=str, help="System prompt to guide the model")
     parser.add_argument('--num-ctx', type=int, help="Context size for the model")
     parser.add_argument('--temperature', type=float, help="Temperature for the model")
     parser.add_argument('--max-tokens', type=int, help="Maximum number of tokens for the model")
-    parser.add_argument('--host', type=str, help="http or https host for the provider, in custom shall be the full api endpoint, not used for groq")
+    parser.add_argument('--host', type=str, help="http or https host for the provider, required for custom provider, not used for groq")
 
 
     # Parse known and unknown arguments
