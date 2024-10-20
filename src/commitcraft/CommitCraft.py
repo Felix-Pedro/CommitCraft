@@ -230,6 +230,26 @@ Your only task is to recive a git diff and return a simple commit message folowi
                 stream=False,
                 **openai_options
             ).choices[0].message.content
+        case 'custom_openai_compatible':
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv('CUSTOM_API_KEY', default='nokey'), base_url=model.host)
+            openai_configs = ('top_p','temperature', 'max_tokens')
+            openai_options = {config : model_options.get(config) if model_options.get(config) else None for config in (set(tuple(model_options.keys())) & set(openai_configs))}
+            return client.chat.completions.create(
+                messages=[
+                    {
+                        "role" : "system",
+                        "content" : system_prompt
+                    },
+                    {
+                        "role" : "user",
+                        "content" : request.diff
+                    }
+                ],
+                model=model.model,
+                stream=False,
+                **openai_options
+            ).choices[0].message.content
 
         case _:
             raise NotImplementedError("provider not found")

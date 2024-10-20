@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from commitcraft import commit_craft, get_diff, CommitCraftRequest, LModelOptions, EmojiConfig, Context, LModel, Provider
+from commitcraft import commit_craft, get_diff, CommitCraftRequest, LModelOptions, EmojiConfig, Context, LModel
 import argparse
 
 load_dotenv()
