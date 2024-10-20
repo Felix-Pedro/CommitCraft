@@ -95,6 +95,28 @@ options = {num_ctx = 8192, temperature = 0.7}
 emoji_steps = "single"
 emoji_convention = "simple"
 ```
+
+## Privacy
+
+CommitCraft itself does not log, record or send any information about your usage and project, or any other info. 
+
+However, it is important to note that by using CommitCraft, you are agreeing to the terms of the providers you choose, as CommitCraft sends diffs and contextual information to their API. Unless you self-host the application, these providers may still collect your request history and metadata information. For more detailed information about how each provider handles your data, please review their respective privacy policies:
+
+- [Groq](https://groq.com/privacy-policy/)
+- [Google](https://ai.google.dev/gemini-api/terms)
+- [OpenAI](https://openai.com/policies/privacy-policy/)
+
+## Princing
+
+CommitCraft is Free Software in this case free as in freedom and as in no price atached.
+
+But, similar to privacy concerns, if you are not self-hosting your models, it's important to be aware of the pricing structure for the providers you use. As of now, Groq and Google provide a free tier, while OpenAI operates on a fully usage-based pricing model. For more detailed information about pricing options, please refer to the documentation provided by each provider:
+
+- [Groq](https://groq.com/pricing/)
+- [Google](https://ai.google.dev/pricing)
+- [OpenAI](https://openai.com/api/pricing/)
+
+
 ## License
 
 This project is licensed under the AGPL 3.0 License - see the [LICENSE](LICENSE) file for details.
