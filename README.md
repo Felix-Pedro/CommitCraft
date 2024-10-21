@@ -96,6 +96,8 @@ emoji_steps = "single"
 emoji_convention = "simple"
 ```
 
+You may want those settings to be 3 diferent files so for example the provider could be decided on a user by user basis, adding the models config file to the .gitignore file, but the emoji and context settings may be tracked by git.
+
 ### Environment Variables
 
 For secrets this project uses either .env file in the root of execution, or system wide vars, for reference we provide a .env.example file that provides every secret used by the code.
