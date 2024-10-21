@@ -7,6 +7,10 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [Unreleased]
 
+Nothing yet!
+
+## [0.1.0] - 2024-10-21
+
 ### Added
 
 - Custom system prompt.
@@ -19,4 +23,5 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - GitMoji prompt.
 - Default system prompt.
 
-[unreleased]: https://github.com/Felix-Pedro/CommitCraft
+[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/latest...HEAD
+[0.1.0]: https://github.com/Felix-Pedro/CommitCraft/releases/tag/v0.1.0
