@@ -8,6 +8,7 @@ CommitCraft is a tool designed to enhance your commit messages by leveraging Lar
 - **Configurable Context Size**: Automatically adjusts the context size for optimal performance. (Ollama only)
 - **Emoji Support**: Option to include emojis in your commit messages based on predefined conventions. Pre-configured witch gitmoji specification.
 - **User-Friendly CLI**: A command-line interface allows users to easily specify provider, model, and other settings.
+- **Customizable**: Allows to easily setup a personalized system prompt and contextual information for tuning your results to your project commit guidlines.
 
 ## Installation
 
@@ -136,6 +137,7 @@ But, similar to privacy concerns, if you are not self-hosting your models, it's 
 If for some reason a dependency is missing folow these steps:
 
 1. Run the folowing command 
+
 ```sh
 pipx inject commitcraft [depency_name]
 ```
