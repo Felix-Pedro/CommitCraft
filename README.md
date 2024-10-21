@@ -17,23 +17,24 @@ You can install CommitCraft using `pipx` for a hassle-free experience:
 ```bash
 pipx install commitcraft
 ```
+Note : the default instalations is ollama only.
 
 If you intent to use some provider other than ollama consider using one of the folowing:
 
 ```bash
-pipx install commitcraft[openai]
+pipx install 'commitcraft[openai]'
 ```
 
 ```bash
-pipx install commitcraft[groq]
+pipx install 'commitcraft[groq]'
 ```
 
 ```bash
-pipx install commitcraft[google]
+pipx install 'commitcraft[google]'
 ```
 
 ```bash
-pipx install commitcraft[all-providers]
+pipx install 'commitcraft[all-providers]'
 ```
 
 
