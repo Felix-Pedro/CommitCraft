@@ -131,6 +131,17 @@ But, similar to privacy concerns, if you are not self-hosting your models, it's 
 - [Google](https://ai.google.dev/pricing)
 - [OpenAI](https://openai.com/api/pricing/)
 
+## Troubleshooting
+
+If for some reason a dependency is missing folow these steps:
+
+1. Run the folowing command 
+```sh
+pipx inject commitcraft [depency_name]
+```
+
+2. Report the problem to the issues page, also provid the command you used to install.
+
 
 ## License
 
