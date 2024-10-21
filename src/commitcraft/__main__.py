@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from commitcraft import commit_craft, get_diff, CommitCraftRequest, LModelOptions, EmojiConfig, Context, LModel
 import argparse
 
-load_dotenv()
 
 def load_file(filepath):
     """Loads configuration from a TOML, YAML, or JSON file."""
@@ -59,6 +58,9 @@ def load_config():
     }
 
 def main():
+    
+    load_dotenv(os.path.join(os.getcwd(), ".env"))
+    
     parser = argparse.ArgumentParser(description="CommitCraft - Craft better commit messages using AI.")
 
     # Command-line arguments for overriding settings
