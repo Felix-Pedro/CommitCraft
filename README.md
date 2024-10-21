@@ -96,6 +96,19 @@ emoji_steps = "single"
 emoji_convention = "simple"
 ```
 
+### Environment Variables
+
+For secrets this project uses either .env file in the root of execution, or system wide vars, for reference we provide a .env.example file that provides every secret used by the code.
+
+```sh
+OLLAMA_HOST=http://localhost:11434
+OPENAI_API_KEY=sk-your-api-key-here
+GROQ_API_KEY=you_api_key
+GOOGLE_API_KEY=key
+CUSTOM_API_KEY=hey
+```
+
+
 ## Privacy
 
 CommitCraft itself does not log, record or send any information about your usage and project, or any other info. 
