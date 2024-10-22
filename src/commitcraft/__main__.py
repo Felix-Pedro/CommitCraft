@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from commitcraft import commit_craft, get_diff, CommitCraftRequest, LModelOptions, EmojiConfig, Context, LModel
+from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, Context, LModel
 import argparse
 
 
@@ -58,9 +58,9 @@ def load_config():
     }
 
 def main():
-    
+
     load_dotenv(os.path.join(os.getcwd(), ".env"))
-    
+
     parser = argparse.ArgumentParser(description="CommitCraft - Craft better commit messages using AI.")
 
     # Command-line arguments for overriding settings
@@ -125,15 +125,12 @@ def main():
     )
 
     # Construct the request using provided arguments or defaults
-    request = CommitCraftRequest(
-        diff=diff,
-        models=model_config,
-        emoji=emoji_config,
-        context=context_info
+    input = CommitCraftInput(
+        diff=get_diff()
     )
 
     # Call the commit_craft function and print the result
-    response = commit_craft(request)
+    response = commit_craft(input, model_config, context_info, emoji_config)
     print(response)
 
 if __name__ == '__main__':
