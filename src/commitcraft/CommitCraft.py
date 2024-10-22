@@ -1,6 +1,7 @@
 import subprocess
 from .defaults import default
 from enum import Enum
+from typing import List
 from pydantic import BaseModel, conint, Extra, root_validator, HttpUrl
 from typing import Optional
 import os
@@ -107,16 +108,18 @@ class EmojiConfig(BaseModel):
     emoji_convention: str = "simple"
     emoji_model: Optional[LModel] = None
 
-class CommitCraftRequest(BaseModel):
+class CommitCraftInput(BaseModel):
     diff: str
-    models: LModel = LModel() # Will support multiple models in 1.1.0 but for now only one
-    emoji: EmojiConfig = EmojiConfig()
-    context: Optional[Context] = None
+    clues: List[str] = []
 
-def commit_craft(request: CommitCraftRequest) -> str:
+def commit_craft(
+    input : CommitCraftInput,
+    models : LModel = LModel(), # Will support multiple models in 1.1.0 but for now only one
+    context : Optional[Context] = None,
+    emoji : Optional[EmojiConfig] = None) -> str:
     """CommitCraft generates a system message and requests a commit message based on staged changes """
-    context_info = request.context
-    system_prompt = request.models.system_prompt
+    context_info = context
+    system_prompt = models.system_prompt
     if not system_prompt and context_info:
         if (context_info.project_name and context_info.project_language and context_info.project_description):
             system_prompt = f'''
@@ -150,15 +153,14 @@ Your only task is to recive a git diff and return a simple commit message folowi
 
 {default.get("commit_guidelines")}
         '''.strip()
+    if emoji:
+        if emoji.emoji_steps == EmojiSteps.single:
+            if emoji.emoji_convention in ('simple', 'full'):
+                system_prompt += f"\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention, '')}"
+            elif emoji.emoji_convention:
+                system_prompt += f"\n\n{emoji.emoji_convention}"
 
-    emoji = request.emoji
-    if emoji.emoji_steps == EmojiSteps.single:
-        if emoji.emoji_convention in ('simple', 'full'):
-            system_prompt+=f"\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention)}"
-        elif emoji.emoji_convention:
-            system_prompt+=f"\n\n{emoji.emoji_convention}"
-
-    model = request.models
+    model = models
     model_options = model.options.dict() if model.options else {}
     match model.provider:
         case "ollama":
@@ -169,23 +171,23 @@ Your only task is to recive a git diff and return a simple commit message folowi
                     return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
-                        prompt=request.diff,
+                        prompt=input.diff,
                         options=model_options
                     )['response']
                 else:
-                    model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
+                    model_options['num_ctx'] = get_context_size(input.diff, system_prompt)
                     return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
-                        prompt=request.diff,
+                        prompt=input.diff,
                         options=model_options
                     )['response']
             else:
-                model_options['num_ctx'] = get_context_size(request.diff, system_prompt)
+                model_options['num_ctx'] = get_context_size(input.diff, system_prompt)
                 return Ollama.generate(
                     model=model.model,
                     system=system_prompt,
-                    prompt=request.diff,
+                    prompt=input.diff,
                     options=model_options
                 )['response']
 
@@ -202,7 +204,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
                     },
                     {
                         "role" : "user",
-                        "content" : request.diff
+                        "content" : input.diff
                     }
                 ],
                 model=model.model,
@@ -216,7 +218,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
             model=genai.GenerativeModel(
               model_name=model.model,
               system_instruction=system_prompt)
-            return model.generate_content(request.diff).text
+            return model.generate_content(input.diff).text
 
         case 'openai':
             from openai import OpenAI
@@ -231,7 +233,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
                     },
                     {
                         "role" : "user",
-                        "content" : request.diff
+                        "content" : input.diff
                     }
                 ],
                 model=model.model,
@@ -252,7 +254,7 @@ Your only task is to recive a git diff and return a simple commit message folowi
                     },
                     {
                         "role" : "user",
-                        "content" : request.diff
+                        "content" : input.diff
                     }
                 ],
                 model=model.model,
