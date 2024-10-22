@@ -87,6 +87,6 @@ Before submitting a pull request, make sure it meets the following criteria:
 
 ## Code of Conduct
 
-Please note that **CommitCraft** is released with a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to follow these guidelines.
+Please note that **CommitCraft** is released with a [Code of Conduct](CONDUCT.md). By participating, you agree to follow these guidelines.
 
 Thank you for your contributions!
