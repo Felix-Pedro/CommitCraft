@@ -59,6 +59,7 @@ Ready to get started? Here's how you can set up **CommitCraft** for local develo
 
    Create a new branch for your bug fix or feature:
    ```bash
+   git checkout dev
    git checkout -b name-of-your-bugfix-or-feature
    ```
 
