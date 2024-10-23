@@ -1,8 +1,11 @@
 import os
 from dotenv import load_dotenv
 from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, Context, LModel
-import argparse
+import typer
+from typing import Optional
+from typing_extensions import Annotated, Any
 
+app = typer.Typer()
 
 def load_file(filepath):
     """Loads configuration from a TOML, YAML, or JSON file."""
@@ -50,88 +53,79 @@ def load_config():
        config =  load_file(config_file)
        return config
 
-
     return {
         "context": context,
         "models": models,
         "emoji": emoji
     }
 
-def main():
-
+@app.command()
+def main(
+    provider:  Annotated[Optional[str], typer.Option(help="Provider for the AI model (supported values are 'ollama', 'groq', 'google', 'openai' and 'custom_openai_compatible')")] = None,
+    model: Annotated[Optional[str], typer.Option(help="Model name (e.g., 'gemma2', 'llama3.1:70b')")] = None,
+    config_file: Annotated[Optional[str], typer.Option(help="Path to the config file (TOML, YAML, or JSON)")] = None,
+    system_prompt: Annotated[Optional[str], typer.Option(help="System prompt to guide the model")] = None,
+    num_ctx: Annotated[Optional[int], typer.Option(help="Context size for the model")] = None,
+    temperature: Annotated[Optional[float], typer.Option(help="Temperature for the model")] = None,
+    max_tokens: Annotated[Optional[int], typer.Option(help="Maximum number of tokens for the model")] = None,
+    host: Annotated[Optional[str], typer.Option(help="HTTP or HTTPS host for the provider, required for custom provider, not used for groq")] = None,
+):
     load_dotenv(os.path.join(os.getcwd(), ".env"))
-
-    parser = argparse.ArgumentParser(description="CommitCraft - Craft better commit messages using AI.")
-
-    # Command-line arguments for overriding settings
-    parser.add_argument('--provider', type=str, help="Provider for the AI model (supported values are 'ollama', 'groq', 'google', 'openai' and 'custom_openai_compatible')")
-    parser.add_argument('--model', type=str, help="Model name (e.g., 'gemma2', 'llama3.1:70b')")
-    parser.add_argument('--config-file', type=str, help="Path to the config file (TOML, YAML, or JSON)")
-    parser.add_argument('--system-prompt', type=str, help="System prompt to guide the model")
-    parser.add_argument('--num-ctx', type=int, help="Context size for the model")
-    parser.add_argument('--temperature', type=float, help="Temperature for the model")
-    parser.add_argument('--max-tokens', type=int, help="Maximum number of tokens for the model")
-    parser.add_argument('--host', type=str, help="http or https host for the provider, required for custom provider, not used for groq")
-
-
-    # Parse known and unknown arguments
-    args, unknown_args = parser.parse_known_args()
 
     # Get the git diff
     diff = get_diff()
 
     # Determine if the context file is provided or try to load the default
-    config_file = args.config_file if args.config_file else None
+    #print(str(config_file))
     config = load_file(config_file) if config_file else load_config()
 
     context_info = Context(**config.get('context')) if config.get('context') else None
     emoji_config = EmojiConfig(**config.get('emoji')) if config.get('emoji') else EmojiConfig(emoji_steps='single', emoji_convention='simple')
     model_config = LModel(**config.get('models')) if config.get('models') else LModel()
 
-
     # Process unknown arguments as additional model options
-    extra_model_options = {}
-    for i in range(0, len(unknown_args), 2):
-        key = unknown_args[i].lstrip('--').replace('-', '_')  # Remove '--' and normalize to snake_case
-        if i + 1 < len(unknown_args):
-            value = unknown_args[i + 1]
-            try:
-                value = int(value)
-            except ValueError:
-                try:
-                    value = float(value)
-                except ValueError:
-                    pass  # Keep as string if not convertible
-            extra_model_options[key] = value
+    # extra_model_options = {}
+    # for i in range(0, len(unknown_args), 2):
+    #    key = unknown_args[i].lstrip('--').replace('-', '_')  # Remove '--' and normalize to snake_case
+    #    if i + 1 < len(unknown_args):
+    #        value = unknown_args[i + 1]
+    #        try:
+        #            value = int(value)
+    #        except ValueError:
+        #            try:
+            #                value = float(value)
+    #            except ValueError:
+        #                pass  # Keep as string if not convertible
+        #        extra_model_options[key] = value
 
     # Construct the model options
     lmodel_options = LModelOptions(
-        num_ctx=args.num_ctx if args.num_ctx else None,
-        temperature=args.temperature if args.temperature else None,
-        max_tokens=args.max_tokens if args.max_tokens else None,
-        **extra_model_options  # Merge extra model options here
+        num_ctx=num_ctx if num_ctx else None,
+        temperature=temperature if temperature else None,
+        max_tokens=max_tokens if max_tokens else None,
+        #**extra_model_options  # Merge extra model options here
     )
 
     cli_options = lmodel_options.dict()
     config_options = model_config.options.dict() if model_config.options else {}
-    model_options = { config : cli_options.get(config) if cli_options.get(config, False) else config_options.get(config) for config in set(list(cli_options.keys())+list(config_options.keys()))}
+    model_options = {config: cli_options.get(config) if cli_options.get(config, False) else config_options.get(config) for config in set(list(cli_options.keys()) + list(config_options.keys()))}
 
     model_config = LModel(
-        provider=args.provider if args.provider else model_config.provider,
-        model=args.model if args.model else None,
-        system_prompt=args.system_prompt if args.system_prompt else model_config.system_prompt,
-        host=args.host if args.host else model_config.host,
+        provider=provider if provider else model_config.provider,
+        model=model if model else None,
+        system_prompt=system_prompt if system_prompt else model_config.system_prompt,
+        host=host if host else model_config.host,
         options=LModelOptions(**model_options)
     )
 
     # Construct the request using provided arguments or defaults
     input = CommitCraftInput(
-        diff=get_diff()
+        diff=diff
     )
 
     # Call the commit_craft function and print the result
     response = commit_craft(input, model_config, context_info, emoji_config)
     print(response)
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    app()
