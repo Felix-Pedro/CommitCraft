@@ -59,7 +59,7 @@ def load_config():
         "emoji": emoji
     }
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def main(
     config_file: Annotated[
         Optional[str],
@@ -84,12 +84,14 @@ def main(
     max_tokens: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', help="Maximum number of tokens for the model")] = None,
     host: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', help="HTTP or HTTPS host for the provider, required for custom provider, not used for groq")] = None,
 
-    bug: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit fix a bug") ] = False,
+    bug: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit fix a bug, not necessary if using --bug-desc") ] = False,
     bug_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the bug fixed")] = None,
-    feat: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit adds a feature") ] = False,
+    feat: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit adds a feature, not necessary if using --feat-desc") ] = False,
     feat_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the feature added")] = None,
-    docs: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on documentation") ] = False,
-    docs_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the documentation change/addition")] = None
+    docs: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on documentation, not necessary if using --docs-desc") ] = False,
+    docs_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the documentation change/addition")] = None,
+    refact: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on refacotoring, not necessary if using --refact-desc") ] = False,
+    refact_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes refactoring")] = None
 
 ):
     load_dotenv(os.path.join(os.getcwd(), ".env"))
@@ -148,6 +150,20 @@ def main(
     # Call the commit_craft function and print the result
     response = commit_craft(input, model_config, context_info, emoji_config)
     typer.echo(response)
+
+@app.command('init')
+def init():
+    """
+    This Command is not implemented yet.
+    """
+    raise NotImplementedError("This command is not implemented yet")
+
+@app.command('config')
+def config():
+    """
+    This Command is not implemented yet.
+    """
+    raise NotImplementedError("This command is not implemented yet")
 
 if __name__ == "__main__":
     app()

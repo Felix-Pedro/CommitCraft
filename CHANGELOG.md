@@ -7,6 +7,10 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [unreleased]
 
+### Added
+
+- Introducing : CommitClues, a simple way to help your model get a little bit more specific context.
+
 ### Changed
 
 - Refactored CLI to use typer for more flexibility and beter help messages
