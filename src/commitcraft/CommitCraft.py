@@ -154,9 +154,9 @@ Your only task is to recive a git diff and return a simple commit message folowi
     emoji = request.emoji
     if emoji.emoji_steps == EmojiSteps.single:
         if emoji.emoji_convention in ('simple', 'full'):
-            system_prompt+=f'\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention)}'
+            system_prompt+=f"\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention)}"
         elif emoji.emoji_convention:
-            system_prompt+=f'\n\n{emoji.emoji_convention}'
+            system_prompt+=f"\n\n{emoji.emoji_convention}"
 
     model = request.models
     model_options = model.options.dict() if model.options else {}
