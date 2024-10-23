@@ -7,7 +7,13 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [unreleased]
 
-Nothing yet!
+### Changed
+
+- Refactored CLI to use typer for more flexibility and beter help messages
+
+### Removed
+
+- BREAKING CHANGES: extra model options are not named arguments anymore
 
 ## [0.1.1]
 
