@@ -61,14 +61,36 @@ def load_config():
 
 @app.command()
 def main(
-    provider:  Annotated[Optional[str], typer.Option(help="Provider for the AI model (supported values are 'ollama', 'groq', 'google', 'openai' and 'custom_openai_compatible')")] = None,
-    model: Annotated[Optional[str], typer.Option(help="Model name (e.g., 'gemma2', 'llama3.1:70b')")] = None,
-    config_file: Annotated[Optional[str], typer.Option(help="Path to the config file (TOML, YAML, or JSON)")] = None,
-    system_prompt: Annotated[Optional[str], typer.Option(help="System prompt to guide the model")] = None,
-    num_ctx: Annotated[Optional[int], typer.Option(help="Context size for the model")] = None,
-    temperature: Annotated[Optional[float], typer.Option(help="Temperature for the model")] = None,
-    max_tokens: Annotated[Optional[int], typer.Option(help="Maximum number of tokens for the model")] = None,
-    host: Annotated[Optional[str], typer.Option(help="HTTP or HTTPS host for the provider, required for custom provider, not used for groq")] = None,
+    config_file: Annotated[
+        Optional[str],
+        typer.Option(help="Path to the config file (TOML, YAML, or JSON)", show_default='tries to open .commitcraft folder in the root of the repo')
+    ] = None,
+
+    provider:  Annotated[
+        str,
+        typer.Option(rich_help_panel='Model Config', help="Provider for the AI model (supported values are 'ollama', 'groq', 'google', 'openai' and 'custom_openai_compatible')")
+    ] = 'ollama',
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            rich_help_panel='Model Config',
+            help="Model name (e.g., 'gemma2', 'llama3.1:70b')",
+            show_default="ollama: 'gemma2', groq: 'llama-3.1-70b-versatile', google: 'gemini-1,5-pro', openai: 'gpt-3.5-turbo'"
+        )
+    ] = None,
+    system_prompt: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', help="System prompt to guide the model")] = None,
+    num_ctx: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', help="Context size for the model")] = None,
+    temperature: Annotated[Optional[float], typer.Option(rich_help_panel='Model Config', help="Temperature for the model")] = None,
+    max_tokens: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', help="Maximum number of tokens for the model")] = None,
+    host: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', help="HTTP or HTTPS host for the provider, required for custom provider, not used for groq")] = None,
+
+    bug: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit fix a bug") ] = False,
+    bug_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the bug fixed")] = None,
+    feat: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit adds a feature") ] = False,
+    feat_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the feature added")] = None,
+    docs: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on documentation") ] = False,
+    docs_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the documentation change/addition")] = None
+
 ):
     load_dotenv(os.path.join(os.getcwd(), ".env"))
 
@@ -125,7 +147,7 @@ def main(
 
     # Call the commit_craft function and print the result
     response = commit_craft(input, model_config, context_info, emoji_config)
-    print(response)
+    typer.echo(response)
 
 if __name__ == "__main__":
     app()
