@@ -69,6 +69,10 @@ def main(
         Optional[str],
         typer.Option(help="files or file patterns to ignore on the message generation process comma separated", show_default='tries to open .commitcraft/.ignore file of the repo')
     ] = None,
+    debug_prompt: Annotated[
+        bool,
+        typer.Option(help="Return the prompt, don't send any request to the model")
+    ] = False,
 
     provider:  Annotated[
         str,
@@ -96,6 +100,7 @@ def main(
     docs_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the documentation change/addition")] = None,
     refact: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on refacotoring, not necessary if using --refact-desc") ] = False,
     refact_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes refactoring")] = None,
+    context_clue: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Gives the model a custom clue of the current commit")] = None,
 
      project_name: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project name")] = None,
      project_language: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project language")] = None,
@@ -114,7 +119,7 @@ def main(
         with open('./.commitcraft/.ignore') as ignore_file:
             ignored_patterns = list(set([pattern.strip() for pattern in ignore_file.readlines()]))
         if ignore:
-            ignored_patterns = list(set([[pattern.strip() for pattern in ignore.split(',')] + ignored_patterns]))
+            ignored_patterns = list(set([pattern.strip() for pattern in ignore.split(',')] + ignored_patterns))
         diff = filter_diff(diff, ignored_patterns)
 
     elif ignore:
@@ -126,7 +131,7 @@ def main(
     #print(str(config_file))
     config = load_file(config_file) if config_file else load_config()
 
-    context_info = config.get('context') if config.get('context') else {'project_name' : project_name, 'project_language' : project_language, 'project_description' : project_description, 'commit_guidelines' : commit_guide}
+    context_info = config.get('context') if config.get('context', False) else {'project_name' : project_name, 'project_language' : project_language, 'project_description' : project_description, 'commit_guidelines' : commit_guide}
 
     emoji_config = EmojiConfig(**config.get('emoji')) if config.get('emoji') else EmojiConfig(emoji_steps='single', emoji_convention='simple')
     model_config = LModel(**config.get('models')) if config.get('models') else LModel()
@@ -172,11 +177,13 @@ def main(
         bug=bug_desc if bug_desc else bug,
         feat=feat_desc if feat_desc else feat,
         docs=docs_desc if docs_desc else docs,
-        refact=refact_desc if refact_desc else refact
+        refact=refact_desc if refact_desc else refact,
+        custom_clue=context_clue if context_clue else False
+
     )
 
     # Call the commit_craft function and print the result
-    response = commit_craft(input, model_config, context_info, emoji_config)
+    response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt)
     typer.echo(response)
 
 @app.command('init')
