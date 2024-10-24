@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, LModel
+from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, LModel, filter_diff
 import typer
 from typing import Optional
 from typing_extensions import Annotated, Any
@@ -65,6 +65,10 @@ def main(
         Optional[str],
         typer.Option(help="Path to the config file (TOML, YAML, or JSON)", show_default='tries to open .commitcraft folder in the root of the repo')
     ] = None,
+    ignore: Annotated[
+        Optional[str],
+        typer.Option(help="files or file patterns to ignore on the message generation process comma separated", show_default='tries to open .commitcraft/.ignore file of the repo')
+    ] = None,
 
     provider:  Annotated[
         str,
@@ -92,7 +96,7 @@ def main(
     docs_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the documentation change/addition")] = None,
     refact: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on refacotoring, not necessary if using --refact-desc") ] = False,
     refact_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes refactoring")] = None,
-    
+
      project_name: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project name")] = None,
      project_language: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project language")] = None,
      project_description: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project description")] = None,
@@ -106,13 +110,24 @@ def main(
 
     # Get the git diff
     diff = get_diff()
+    if os.path.exists('./.commitcraft/.ignore'):
+        with open('./.commitcraft/.ignore') as ignore_file:
+            ignored_patterns = list(set([pattern.strip() for pattern in ignore_file.readlines()]))
+        if ignore:
+            ignored_patterns = list(set([[pattern.strip() for pattern in ignore.split(',')] + ignored_patterns]))
+        diff = filter_diff(diff, ignored_patterns)
+
+    elif ignore:
+        diff = filter_diff(diff, [pattern.strip() for pattern in ignore.split(',')])
+
+
 
     # Determine if the context file is provided or try to load the default
     #print(str(config_file))
     config = load_file(config_file) if config_file else load_config()
 
     context_info = config.get('context') if config.get('context') else {'project_name' : project_name, 'project_language' : project_language, 'project_description' : project_description, 'commit_guidelines' : commit_guide}
-    
+
     emoji_config = EmojiConfig(**config.get('emoji')) if config.get('emoji') else EmojiConfig(emoji_steps='single', emoji_convention='simple')
     model_config = LModel(**config.get('models')) if config.get('models') else LModel()
 

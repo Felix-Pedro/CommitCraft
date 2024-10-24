@@ -1,5 +1,6 @@
 import subprocess
 import os
+import fnmatch
 from .defaults import default
 from enum import Enum
 from typing import List
@@ -22,6 +23,36 @@ def get_diff() -> str:
     """Retrieve the staged changes in the git repository."""
     diff = subprocess.run(['git', 'diff', '--staged', '-M'], capture_output=True, text=True)
     return diff.stdout
+    
+def matches_pattern(file_path : str, ignored_patterns : List[str]) -> bool:
+    """Check if the file matches any of the ignore patterns using fnmatch"""
+    for pattern in ignored_patterns:
+        if fnmatch.fnmatch(file_path, pattern):
+            return True
+    return False
+    
+def filter_diff(diff_output : str, ignored_patterns : List):
+    """Filters the diff output to exclude files listed in ignored_files."""
+    filtered_diff = []
+    in_diff_block = False
+    current_file = None
+
+    for line in diff_output.splitlines():
+        if line.startswith('diff --git'):
+            in_diff_block = False
+            # Extract the file path from the line, typically it comes after b/
+            # Example: diff --git a/file.txt b/file.txt
+            parts = line.split()
+            if len(parts) > 3:
+                current_file = parts[3][2:]  # Remove the 'b/' prefix
+                in_diff_block = not matches_pattern(current_file, ignored_patterns)
+            else:
+                current_file = None
+
+        if in_diff_block:
+            filtered_diff.append(line)
+
+    return '\n'.join(filtered_diff)
 
 def get_context_size(diff : str, system : str) -> int:
     """Based on the git diff and system prompt estimate ollama context window needed"""
