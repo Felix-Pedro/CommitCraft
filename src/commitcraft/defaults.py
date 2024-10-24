@@ -167,5 +167,10 @@ default={
         {{ docs }}
         {{ refact }}
     {% endif %}
-    '''
+    ''',
+    'bug' : 'This commit focous on fixing a bug',
+    'feat' : 'This commit focous on a new feature',
+    'docs' : 'This commit focous on docs',
+    'refact' : 'This commit focous on refactoring'
+    
 }
