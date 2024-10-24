@@ -10,6 +10,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 ### Added
 
 - Introducing : CommitClues, a simple way to help your model get a little bit more specific context.
+- Ignore files diff for your CommitCraft request using --ignore or .commitcraft/.ignore file
 
 ### Changed
 
