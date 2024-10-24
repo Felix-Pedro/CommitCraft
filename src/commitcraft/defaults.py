@@ -16,7 +16,7 @@ default={
     - Do not return any explanation other then the commit message itself.
     - If there are many changes focous on the main ones.
     - The first row shall be te title of your message, so make it simple and informative.
-    
+    - Do not introduce your message!
     ''',
     'emoji_guidelines' :{
         'full':'''
@@ -142,6 +142,30 @@ default={
     Your mission is to recive a commit message and return an emoji based on the folowing guide.
     Do not explain yourself, return only the single emoji.
     '''
-    }
-        
+    },
+    "system_prompt":'''
+    # Proposure
+    
+    You are a commit message helper {% if project_name or project_language %} for {{ project_name }} {% if project_language %} a project written in {{ project_language }} {% endif %} {% endif %} {% if project_description %} described as: 
+    
+    {{ project_description }}
+    
+    {% else %}.
+    {% endif %}
+    Your only task is to receive a git diff and maybe some clues, then return a simple commit message following these guidelines:
+    
+    {{ commit_guidelines }}
+    ''',
+    "input": '''
+    ############# Beginning of the diff #############
+    {{ diff }}
+    ################ End of the diff ################
+    {% if bug or feat or docs or refact %}
+    Clues:
+        {{ bug }}
+        {{ feat }}
+        {{ docs }}
+        {{ refact }}
+    {% endif %}
+    '''
 }
