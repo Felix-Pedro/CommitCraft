@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, Context, LModel
+from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, LModel
 import typer
 from typing import Optional
 from typing_extensions import Annotated, Any
@@ -91,9 +91,17 @@ def main(
     docs: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on documentation, not necessary if using --docs-desc") ] = False,
     docs_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes the documentation change/addition")] = None,
     refact: Annotated[bool, typer.Option(rich_help_panel='Commit Clues', help="Indicates to the model that the commit focous on refacotoring, not necessary if using --refact-desc") ] = False,
-    refact_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes refactoring")] = None
+    refact_desc: Annotated[Optional[str], typer.Option(rich_help_panel='Commit Clues', help="Describes refactoring")] = None,
+    
+     project_name: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project name")] = None,
+     project_language: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project language")] = None,
+     project_description: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project description")] = None,
+     commit_guide: Annotated[Optional[str], typer.Option(rich_help_panel='Default Context', help="Your Project Commit Guidelines")] = None
 
 ):
+    """
+    Generates a commit message based on the result of `git diff --staged -M` and your clues, via the LLM you choose.
+    """
     load_dotenv(os.path.join(os.getcwd(), ".env"))
 
     # Get the git diff
@@ -103,7 +111,8 @@ def main(
     #print(str(config_file))
     config = load_file(config_file) if config_file else load_config()
 
-    context_info = Context(**config.get('context')) if config.get('context') else None
+    context_info = config.get('context') if config.get('context') else {'project_name' : project_name, 'project_language' : project_language, 'project_description' : project_description, 'commit_guidelines' : commit_guide}
+    
     emoji_config = EmojiConfig(**config.get('emoji')) if config.get('emoji') else EmojiConfig(emoji_steps='single', emoji_convention='simple')
     model_config = LModel(**config.get('models')) if config.get('models') else LModel()
 
@@ -144,7 +153,11 @@ def main(
 
     # Construct the request using provided arguments or defaults
     input = CommitCraftInput(
-        diff=diff
+        diff=diff,
+        bug=bug_desc if bug_desc else bug,
+        feat=feat_desc if feat_desc else feat,
+        docs=docs_desc if docs_desc else docs,
+        refact=refact_desc if refact_desc else refact
     )
 
     # Call the commit_craft function and print the result
