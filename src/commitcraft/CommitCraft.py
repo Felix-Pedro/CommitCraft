@@ -1,10 +1,11 @@
 import subprocess
+import os
 from .defaults import default
 from enum import Enum
 from typing import List
 from pydantic import BaseModel, conint, Extra, root_validator, HttpUrl
 from typing import Optional
-import os
+from jinja2 import Template
 
 # Custom exceptions to be raised when using custom_openai_compatible provider.
 class MissingModelError(ValueError):
@@ -96,13 +97,6 @@ class LModel(BaseModel):
 
             return host
 
-class Context(BaseModel):
-    """Context object for tha commit request"""
-    project_name: Optional[str] = None
-    project_language: Optional[str] = None
-    project_description: Optional[str] = None
-    commit_guidelines: Optional[str] = None
-
 class EmojiConfig(BaseModel):
     emoji_steps: EmojiSteps = EmojiSteps.single
     emoji_convention: str = "simple"
@@ -110,49 +104,23 @@ class EmojiConfig(BaseModel):
 
 class CommitCraftInput(BaseModel):
     diff: str
-    clues: List[str] = []
+    bug: str | bool = False
+    feat: str | bool = False
+    docs: str | bool = False
+    refact: str | bool = False
+    
 
 def commit_craft(
     input : CommitCraftInput,
     models : LModel = LModel(), # Will support multiple models in 1.1.0 but for now only one
-    context : Optional[Context] = None,
+    context : dict[str, str] = {},
     emoji : Optional[EmojiConfig] = None) -> str:
     """CommitCraft generates a system message and requests a commit message based on staged changes """
-    context_info = context
-    system_prompt = models.system_prompt
-    if not system_prompt and context_info:
-        if (context_info.project_name and context_info.project_language and context_info.project_description):
-            system_prompt = f'''
-# Proposure
-
-You are a commit message helper for {context_info.project_name} a project written in {context_info.project_language} described as :
-
-{context_info.project_description}
-
-Your only task is to recive a git diff and return a simple commit message folowing these guidelines:
-
-{context_info.commit_guidelines if context_info.commit_guidelines else  default.get("commit_guidelines")}
-            '''.strip()
-        else:
-            system_prompt = f'''
-# Proposure
-
-You are a commit message helper.
-
-Your only task is to recive a git diff and return a simple commit message folowing these guidelines:
-
-{context_info.commit_guidelines if context_info.commit_guidelines else  default.get("commit_guidelines")}
-            '''.strip()
-    elif not system_prompt and not context_info:
-        system_prompt = f'''
-# Proposure
-
-You are a commit message helper.
-
-Your only task is to recive a git diff and return a simple commit message folowing these guidelines:
-
-{default.get("commit_guidelines")}
-        '''.strip()
+    
+    system_prompt = models.system_prompt if models.system_prompt else default.get('system_prompt','')
+    system_prompt=Template(system_prompt)
+    system_prompt=system_prompt.render(**context)
+    
     if emoji:
         if emoji.emoji_steps == EmojiSteps.single:
             if emoji.emoji_convention in ('simple', 'full'):
