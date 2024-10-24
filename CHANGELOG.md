@@ -19,7 +19,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 - BREAKING CHANGES: extra model options are not named arguments anymore
 
-## [0.1.1]
+## [0.1.1] -2024-10-23
 
 ### Fixed
 
@@ -40,4 +40,5 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - Default system prompt.
 
 [unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/latest...HEAD
+[0.1.1]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Felix-Pedro/CommitCraft/releases/tag/v0.1.0
