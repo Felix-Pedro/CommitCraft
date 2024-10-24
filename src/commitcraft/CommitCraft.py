@@ -23,14 +23,14 @@ def get_diff() -> str:
     """Retrieve the staged changes in the git repository."""
     diff = subprocess.run(['git', 'diff', '--staged', '-M'], capture_output=True, text=True)
     return diff.stdout
-    
+
 def matches_pattern(file_path : str, ignored_patterns : List[str]) -> bool:
     """Check if the file matches any of the ignore patterns using fnmatch"""
     for pattern in ignored_patterns:
         if fnmatch.fnmatch(file_path, pattern):
             return True
     return False
-    
+
 def filter_diff(diff_output : str, ignored_patterns : List):
     """Filters the diff output to exclude files listed in ignored_files."""
     filtered_diff = []
@@ -138,6 +138,7 @@ class CommitCraftInput(BaseModel):
     feat: str | bool = False
     docs: str | bool = False
     refact: str | bool = False
+    custom_clue: str | bool = False
 
 def clue_parser(input : CommitCraftInput) -> dict[str, str | bool]:
     clues_and_input = {}
@@ -145,19 +146,21 @@ def clue_parser(input : CommitCraftInput) -> dict[str, str | bool]:
         if value is True:
             clues_and_input[key] = default.get(key, key)
         else:
-            if key == 'diff':
-                clues_and_input['diff'] = value
-            elif value:
-                clues_and_input[key] = default.get(key, '') + ':' + value
+            #if key == 'diff':
+            #    clues_and_input['diff'] = value
+            if value:
+                clues_and_input[key] = default.get(key, '') + (':' if default.get(key) else '') + value
             else:
-                clues_and_input[key] = value
+                pass
     return clues_and_input
 
 def commit_craft(
     input : CommitCraftInput,
     models : LModel = LModel(), # Will support multiple models in 1.1.0 but for now only one
     context : dict[str, str] = {},
-    emoji : Optional[EmojiConfig] = None
+    emoji : Optional[EmojiConfig] = None,
+    debug_prompt: bool = False
+
 ) -> str:
     """CommitCraft generates a system message and requests a commit message based on staged changes """
 
@@ -178,6 +181,8 @@ def commit_craft(
 
     model = models
     model_options = model.options.dict() if model.options else {}
+    if debug_prompt:
+        return f"system_prompt:\n{system_prompt}\n\n prompt:\n{prompt}"
     match model.provider:
         case "ollama":
             import ollama

@@ -12,7 +12,7 @@ default={
     - Do not talk about the hashes.
     - Create concise and comprehensive commit messages.
     - Be direct about what changed and why. Focous on what.
-    - Give a small summary of what has changed and how it may afect the rest of the project. 
+    - Give a small summary of what has changed and how it may afect the rest of the project.
     - Do not return any explanation other then the commit message itself.
     - If there are many changes focous on the main ones.
     - The first row shall be te title of your message, so make it simple and informative.
@@ -145,32 +145,33 @@ default={
     },
     "system_prompt":'''
     # Proposure
-    
-    You are a commit message helper {% if project_name or project_language %} for {{ project_name }} {% if project_language %} a project written in {{ project_language }} {% endif %} {% endif %} {% if project_description %} described as: 
-    
+
+    You are a commit message helper {% if project_name or project_language %} for {{ project_name }} {% if project_language %} a project written in {{ project_language }} {% endif %} {% endif %} {% if project_description %} described as:
+
     {{ project_description }}
-    
+
     {% else %}.
     {% endif %}
     Your only task is to receive a git diff and maybe some clues, then return a simple commit message following these guidelines:
-    
+
     {{ commit_guidelines }}
     ''',
     "input": '''
     ############# Beginning of the diff #############
     {{ diff }}
     ################ End of the diff ################
-    {% if bug or feat or docs or refact %}
+    {% if bug or feat or docs or refact or custom_clue %}
     Clues:
         {{ bug }}
         {{ feat }}
         {{ docs }}
         {{ refact }}
+        {{ custom_clue }}
     {% endif %}
     ''',
     'bug' : 'This commit focous on fixing a bug',
     'feat' : 'This commit focous on a new feature',
     'docs' : 'This commit focous on docs',
     'refact' : 'This commit focous on refactoring'
-    
+
 }
