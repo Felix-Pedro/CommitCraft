@@ -54,7 +54,6 @@ class Provider(str, Enum):
     groq = 'groq'
     oai_custom = 'custom_openai_compatible'
 
-
 class LModel(BaseModel):
     """The model object containin the provider, model name, system prompt, option and host"""
     provider: Provider = Provider.ollama
@@ -108,19 +107,37 @@ class CommitCraftInput(BaseModel):
     feat: str | bool = False
     docs: str | bool = False
     refact: str | bool = False
-    
+
+def clue_parser(input : CommitCraftInput) -> dict[str, str | bool]:
+    clues_and_input = {}
+    for key, value in input.dict().items():
+        if value is True:
+            clues_and_input[key] = default.get(key, key)
+        else:
+            if key == 'diff':
+                clues_and_input['diff'] = value
+            elif value:
+                clues_and_input[key] = default.get(key, '') + ':' + value
+            else:
+                clues_and_input[key] = value
+    return clues_and_input
 
 def commit_craft(
     input : CommitCraftInput,
     models : LModel = LModel(), # Will support multiple models in 1.1.0 but for now only one
     context : dict[str, str] = {},
-    emoji : Optional[EmojiConfig] = None) -> str:
+    emoji : Optional[EmojiConfig] = None
+) -> str:
     """CommitCraft generates a system message and requests a commit message based on staged changes """
-    
+
     system_prompt = models.system_prompt if models.system_prompt else default.get('system_prompt','')
-    system_prompt=Template(system_prompt)
-    system_prompt=system_prompt.render(**context)
-    
+    system_prompt = Template(system_prompt)
+    system_prompt = system_prompt.render(**context)
+
+    input_wrapper = Template(default.get('input', ''))
+    input_data = clue_parser(input)
+    prompt = input_wrapper.render(**input_data)
+
     if emoji:
         if emoji.emoji_steps == EmojiSteps.single:
             if emoji.emoji_convention in ('simple', 'full'):
@@ -139,23 +156,23 @@ def commit_craft(
                     return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
-                        prompt=input.diff,
+                        prompt=prompt,
                         options=model_options
                     )['response']
                 else:
-                    model_options['num_ctx'] = get_context_size(input.diff, system_prompt)
+                    model_options['num_ctx'] = get_context_size(prompt, system_prompt)
                     return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
-                        prompt=input.diff,
+                        prompt=prompt,
                         options=model_options
                     )['response']
             else:
-                model_options['num_ctx'] = get_context_size(input.diff, system_prompt)
+                model_options['num_ctx'] = get_context_size(prompt, system_prompt)
                 return Ollama.generate(
                     model=model.model,
                     system=system_prompt,
-                    prompt=input.diff,
+                    prompt=prompt,
                     options=model_options
                 )['response']
 
@@ -172,7 +189,7 @@ def commit_craft(
                     },
                     {
                         "role" : "user",
-                        "content" : input.diff
+                        "content" : prompt
                     }
                 ],
                 model=model.model,
@@ -186,7 +203,7 @@ def commit_craft(
             model=genai.GenerativeModel(
               model_name=model.model,
               system_instruction=system_prompt)
-            return model.generate_content(input.diff).text
+            return model.generate_content(prompt).text
 
         case 'openai':
             from openai import OpenAI
@@ -201,7 +218,7 @@ def commit_craft(
                     },
                     {
                         "role" : "user",
-                        "content" : input.diff
+                        "content" : prompt
                     }
                 ],
                 model=model.model,
@@ -222,7 +239,7 @@ def commit_craft(
                     },
                     {
                         "role" : "user",
-                        "content" : input.diff
+                        "content" : prompt
                     }
                 ],
                 model=model.model,
