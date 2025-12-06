@@ -62,7 +62,7 @@ def get_context_size(diff : str, system : str) -> int:
 
 
 class EmojiSteps(Enum):
-    """If emoji should be performed in the same step as the message or in a separe one"""
+    """If emoji should be performed in the same step as the message or in a separated one"""
     single = 'single'
     step2 = '2-step'
     false = False
