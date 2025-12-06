@@ -99,11 +99,11 @@ class LModel(BaseModel):
         provider = values.get('provider')
         if 'model' not in values or values['model'] is None:
             if provider == Provider.ollama:
-                values['model'] = 'gemma2'
+                values['model'] = 'qwen3'
             if provider == Provider.groq:
-                values['model'] = 'llama-3.1-70b-versatile'
+                values['model'] = 'qwen/qwen3-32b'
             elif provider == Provider.google:
-                values['model'] = 'gemini-1.5-pro'
+                values['model'] = 'gemini-2.5-pro'
             elif provider == Provider.openai:
                 values['model'] = 'gpt-3.5-turbo'
         return values
