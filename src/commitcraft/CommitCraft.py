@@ -234,12 +234,29 @@ def commit_craft(
             ).choices[0].message.content
 
         case 'google':
-            import google.generativeai as genai
-            genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-            model=genai.GenerativeModel(
-              model_name=model.model,
-              system_instruction=system_prompt)
-            return model.generate_content(prompt).text
+            from google import genai
+            from google.genai import types
+
+            client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
+
+            google_config = {}
+            if system_prompt:
+                google_config['system_instruction'] = system_prompt
+
+            if model_options:
+                 if model_options.get('temperature'):
+                     google_config['temperature'] = model_options.get('temperature')
+                 if model_options.get('max_tokens'):
+                     google_config['max_output_tokens'] = model_options.get('max_tokens')
+                 if model_options.get('top_p'):
+                     google_config['top_p'] = model_options.get('top_p')
+
+            response = client.models.generate_content(
+                model=model.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(**google_config)
+            )
+            return response.text
 
         case 'openai':
             from openai import OpenAI
