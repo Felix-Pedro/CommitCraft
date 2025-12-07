@@ -233,28 +233,31 @@ def main(
     ] = False,
 
     provider:  Annotated[
-        str,
+        Optional[str],
         typer.Option(
             rich_help_panel='Model Config',
+            envvar="COMMITCRAFT_PROVIDER",
             help="Provider for the AI model (supported: [magenta]ollama[/magenta], [magenta]groq[/magenta], [magenta]google[/magenta], [magenta]openai[/magenta], [magenta]custom_openai_compatible[/magenta])"
         )
-    ] = 'ollama',
+    ] = None,
     model: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Model Config',
+            envvar="COMMITCRAFT_MODEL",
             help="Model name (e.g., [cyan]gemma2[/cyan], [cyan]llama3.1:70b[/cyan])",
             show_default="ollama: [cyan]qwen3[/cyan], groq: [cyan]qwen/qwen3-32b[/cyan], google: [cyan]gemini-2.5-pro[/cyan], openai: [cyan]gpt-3.5-turbo[/cyan]"
         )
     ] = None,
-    system_prompt: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', help="System prompt to guide the model")] = None,
-    num_ctx: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', help="Context size for the model")] = None,
-    temperature: Annotated[Optional[float], typer.Option(rich_help_panel='Model Config', help="Temperature for the model")] = None,
-    max_tokens: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', help="Maximum number of tokens for the model")] = None,
+    system_prompt: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', envvar="COMMITCRAFT_SYSTEM_PROMPT", help="System prompt to guide the model")] = None,
+    num_ctx: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', envvar="COMMITCRAFT_NUM_CTX", help="Context size for the model")] = None,
+    temperature: Annotated[Optional[float], typer.Option(rich_help_panel='Model Config', envvar="COMMITCRAFT_TEMPERATURE", help="Temperature for the model")] = None,
+    max_tokens: Annotated[Optional[int], typer.Option(rich_help_panel='Model Config', envvar="COMMITCRAFT_MAX_TOKENS", help="Maximum number of tokens for the model")] = None,
     host: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Model Config',
+            envvar="COMMITCRAFT_HOST",
             help="HTTP or HTTPS host for the provider, required for custom provider, not used for groq"
         )
     ] = None,
@@ -262,6 +265,7 @@ def main(
         bool,
         typer.Option(
             rich_help_panel='Model Config',
+            envvar="COMMITCRAFT_SHOW_THINKING",
             help="Show the model's thinking process if available"
         )
     ] = False,
