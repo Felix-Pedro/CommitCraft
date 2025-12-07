@@ -383,4 +383,4 @@ This project is licensed under the AGPL 3.0 License - see the [LICENSE](https://
 
 ---
 
-Thank you for using CommitCraft! We hope this tool helps you craft better commit messages effortlessly.
+Thank you for using CommitCraft! We hope this tool helps you craft better commit messages effortlessly.  
