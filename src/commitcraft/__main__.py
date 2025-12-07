@@ -588,12 +588,28 @@ def _install_hook(global_hook: bool, interactive: bool = True):
     except:
         package_version = "unknown"
 
+    # Determine if this is a global or local hook based on the hook_dir
+    is_global_install = global_hook
+    hook_location = "global" if is_global_install else "local"
+    hook_mode = "interactive" if interactive else "non-interactive"
+
+    # Build the update command based on mode and location
+    update_flags = ""
+    if is_global_install:
+        update_flags += " --global"
+    if not interactive:
+        update_flags += " --no-interactive"
+
+    update_command = f"CommitCraft hook{update_flags}"
+
     # Create the hook script based on interactive mode
     if interactive:
         hook_script = f'''#!/bin/sh
 # CommitCraft Git Hook (Interactive Mode)
 # Automatically generates commit messages using AI with optional CommitClues
 # Hook Version: {package_version}
+# Hook Location: {hook_location}
+# Hook Mode: {hook_mode}
 
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
@@ -604,7 +620,7 @@ INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m/
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
     echo "⚠️  CommitCraft hook is outdated (hook: $HOOK_VERSION, installed: $INSTALLED_VERSION)" >&2
-    echo "   Update with: CommitCraft hook --uninstall && CommitCraft hook" >&2
+    echo "   Update with: {update_command}" >&2
     echo "" >&2
 fi
 
@@ -702,6 +718,8 @@ fi
 # CommitCraft Git Hook (Non-Interactive Mode)
 # Automatically generates commit messages using AI
 # Hook Version: {package_version}
+# Hook Location: {hook_location}
+# Hook Mode: {hook_mode}
 
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
@@ -712,7 +730,7 @@ INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m/
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
     echo "⚠️  CommitCraft hook is outdated (hook: $HOOK_VERSION, installed: $INSTALLED_VERSION)" >&2
-    echo "   Update with: CommitCraft hook --uninstall && CommitCraft hook" >&2
+    echo "   Update with: {update_command}" >&2
     echo "" >&2
 fi
 
