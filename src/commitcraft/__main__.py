@@ -477,6 +477,10 @@ def hook(
         bool,
         typer.Option("--global", "-g", help="Install as global git hook template")
     ] = False,
+    no_interactive: Annotated[
+        bool,
+        typer.Option("--no-interactive", help="Disable interactive prompts for CommitClues in the hook")
+    ] = False,
 ):
     """
     [bold cyan]Set up CommitCraft as a git commit hook.[/bold cyan]
@@ -484,6 +488,11 @@ def hook(
     Installs a [yellow]prepare-commit-msg[/yellow] hook that automatically generates commit messages.
     The generated message will be pre-filled in your editor for you to review and edit.
 
+    [bold]Modes:[/bold]
+    • [cyan]Interactive (default)[/cyan]: Prompts for commit type (bug/feature/docs/refactor) and optional description
+    • [dim]Non-interactive[/dim]: Generates messages without prompts (use [yellow]--no-interactive[/yellow])
+
+    [bold]Installation:[/bold]
     • [green]Local install[/green]: Installs hook in current repository's .git/hooks/
     • [blue]Global install[/blue]: Sets up git template for all new repositories
     • [red]Uninstall[/red]: Removes the CommitCraft hook
@@ -494,9 +503,9 @@ def hook(
     if uninstall:
         _uninstall_hook(global_hook)
     else:
-        _install_hook(global_hook)
+        _install_hook(global_hook, interactive=not no_interactive)
 
-def _install_hook(global_hook: bool):
+def _install_hook(global_hook: bool, interactive: bool = True):
     """Install the CommitCraft git hook."""
     from pathlib import Path
     import subprocess
@@ -552,9 +561,97 @@ def _install_hook(global_hook: bool):
                     console.print("[yellow]Installation cancelled.[/yellow]")
                     raise typer.Exit(0)
 
-    # Create the hook script
-    hook_script = '''#!/bin/sh
-# CommitCraft Git Hook
+    # Create the hook script based on interactive mode
+    if interactive:
+        hook_script = '''#!/bin/sh
+# CommitCraft Git Hook (Interactive Mode)
+# Automatically generates commit messages using AI with optional CommitClues
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Only generate message for regular commits (not merge, squash, etc.)
+if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
+    # Check if there are staged changes
+    if git diff --cached --quiet; then
+        exit 0
+    fi
+
+    # Interactive prompt for commit type
+    # Redirect input from terminal to make read work in git hook
+    exec < /dev/tty
+
+    echo "CommitCraft: What type of commit is this?"
+    echo "  [b] Bug fix"
+    echo "  [f] Feature"
+    echo "  [d] Documentation"
+    echo "  [r] Refactoring"
+    echo "  [n] None (no specific type)"
+    printf "Your choice (b/f/d/r/n) [n]: "
+    read -r COMMIT_TYPE
+
+    # Build CommitCraft command based on user input
+    COMMITCRAFT_CMD="CommitCraft"
+
+    case "$COMMIT_TYPE" in
+        b|B)
+            printf "Describe the bug fix (optional): "
+            read -r BUG_DESC
+            if [ -n "$BUG_DESC" ]; then
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --bug-desc \"$BUG_DESC\""
+            else
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --bug"
+            fi
+            ;;
+        f|F)
+            printf "Describe the feature (optional): "
+            read -r FEAT_DESC
+            if [ -n "$FEAT_DESC" ]; then
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --feat-desc \"$FEAT_DESC\""
+            else
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --feat"
+            fi
+            ;;
+        d|D)
+            printf "Describe the documentation change (optional): "
+            read -r DOCS_DESC
+            if [ -n "$DOCS_DESC" ]; then
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --docs-desc \"$DOCS_DESC\""
+            else
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --docs"
+            fi
+            ;;
+        r|R)
+            printf "Describe the refactoring (optional): "
+            read -r REFACT_DESC
+            if [ -n "$REFACT_DESC" ]; then
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --refact-desc \"$REFACT_DESC\""
+            else
+                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --refact"
+            fi
+            ;;
+        *)
+            # No specific type, use default
+            ;;
+    esac
+
+    # Generate commit message with CommitCraft
+    # Use eval to properly handle the command with arguments
+    GENERATED_MSG=$(eval "$COMMITCRAFT_CMD")
+
+    if [ $? -eq 0 ] && [ -n "$GENERATED_MSG" ]; then
+        # Prepend generated message to commit message file
+        echo "$GENERATED_MSG" > "$COMMIT_MSG_FILE.tmp"
+        echo "" >> "$COMMIT_MSG_FILE.tmp"
+        echo "# AI-generated commit message above. Edit as needed." >> "$COMMIT_MSG_FILE.tmp"
+        cat "$COMMIT_MSG_FILE" >> "$COMMIT_MSG_FILE.tmp"
+        mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
+    fi
+fi
+'''
+    else:
+        hook_script = '''#!/bin/sh
+# CommitCraft Git Hook (Non-Interactive Mode)
 # Automatically generates commit messages using AI
 
 COMMIT_MSG_FILE=$1
@@ -589,15 +686,20 @@ fi
     # Make it executable
     hook_path.chmod(0o755)
 
+    mode_text = "[cyan]interactive[/cyan]" if interactive else "[dim]non-interactive[/dim]"
+
     if global_hook:
-        console.print("[success]✓[/success] Global git hook installed successfully!", style="bold green")
+        console.print(f"[success]✓[/success] Global git hook installed successfully ({mode_text} mode)!", style="bold green")
         console.print(f"[cyan]Location:[/cyan] {hook_path}")
         console.print("\n[yellow]Note:[/yellow] This will apply to newly initialized repositories.")
         console.print("For existing repos, run [cyan]CommitCraft hook[/cyan] in each repository.")
     else:
-        console.print("[success]✓[/success] Git hook installed successfully!", style="bold green")
+        console.print(f"[success]✓[/success] Git hook installed successfully ({mode_text} mode)!", style="bold green")
         console.print(f"[cyan]Location:[/cyan] {hook_path}")
-        console.print("\n[green]Next time you commit, CommitCraft will generate a message for you![/green]")
+        if interactive:
+            console.print("\n[green]Next time you commit, you'll be prompted for commit type and CommitCraft will generate a message![/green]")
+        else:
+            console.print("\n[green]Next time you commit, CommitCraft will generate a message for you![/green]")
 
 def _uninstall_hook(global_hook: bool):
     """Uninstall the CommitCraft git hook."""
