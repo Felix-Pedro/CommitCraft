@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import random
 
 # Force color support by default (fixes zsh detection issues)
 # Use --no-color flag or NO_COLOR=1 environment variable to disable
@@ -34,6 +35,30 @@ import rich.console
 rich.console._console = console
 
 app = typer.Typer(rich_markup_mode="rich")
+
+# Funny loading messages for commit generation
+LOADING_MESSAGES = [
+    "[success]Asking the AI to read your mind...[/success]",
+    "[success]Teaching the model about good commit messages...[/success]",
+    "[success]Generating commit message... (No, it's not skynet... yet)[/success]",
+    "[success]Consulting the neural oracle...[/success]",
+    "[success]Translating diff to human...[/success]",
+    "[success]Running git blame on the AI...[/success]",
+    "[success]Convincing the LLM this isn't just 'fixed stuff'...[/success]",
+    "[success]Teaching robots to write poetry (sort of)...[/success]",
+    "[success]Generating commit message... (99 bugs in the code...)[/success]",
+    "[success]Asking GPT what you actually changed...[/success]",
+    "[success]Warming up the silicon brain cells...[/success]",
+    "[success]Turning your diff into Shakespeare...[/success]",
+    "[success]Making the commit message sound professional...[/success]",
+    "[success]Avoiding 'WIP', 'fix', and 'asdf'...[/success]",
+    "[success]Calculating the meaning of your code changes...[/success]",
+    "[success]Training AI to understand programmer humor...[/success]",
+    "[success]Beep boop... generating human-readable text...[/success]",
+    "[success]Channeling the spirit of Linus Torvalds...[/success]",
+    "[success]Hoping this commit makes sense...[/success]",
+    "[success]Crafting the perfect commit (no pressure)...[/success]",
+]
 
 def load_file(filepath):
     """Loads configuration from a TOML, YAML, or JSON file."""
@@ -349,7 +374,8 @@ def main(
         )
 
         # Call the commit_craft function and print the result
-        with err_console.status("[success]Generating commit message...[/success]", spinner="dots"):
+        loading_message = random.choice(LOADING_MESSAGES)
+        with err_console.status(loading_message, spinner="dots"):
             response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt)
         
         # Process <think> tags
