@@ -641,6 +641,11 @@ if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unk
     echo "" >&2
 fi
 
+# Skip if rebase is in progress
+if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
+    exit 0
+fi
+
 # Only generate message for regular commits (not merge, squash, etc.)
 if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
     # Check if there are staged changes
@@ -749,6 +754,11 @@ if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unk
     printf "\\033[1;33m⚠️  CommitCraft hook is outdated\\033[0m \\033[2m(hook: \\033[1;31m%s\\033[0m\\033[2m, installed: \\033[1;32m%s\\033[0m\\033[2m)\\033[0m\\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
     printf "   \\033[1;36mUpdate with:\\033[0m \\033[1;97m{update_command}\\033[0m\\n" >&2
     echo "" >&2
+fi
+
+# Skip if rebase is in progress
+if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
+    exit 0
 fi
 
 # Only generate message for regular commits (not merge, squash, etc.)
