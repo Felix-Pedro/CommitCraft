@@ -6,8 +6,10 @@ import json
 import yaml
 from .defaults import default
 from urllib.parse import urlparse
+from rich.prompt import Prompt
 
 def validate_url(url: str) -> bool:
+    if url == 'ollama_cloud': return True
     try:
         result = urlparse(url)
         return all([result.scheme, result.netloc])
@@ -17,11 +19,17 @@ def validate_url(url: str) -> bool:
 def get_input_with_default(prompt_text, default_val):
     return typer.prompt(prompt_text, default=default_val)
 
+def get_masked_input(prompt_text):
+    return Prompt.ask(prompt_text, password=True)
+
 def fetch_models(provider, api_key=None, host=None):
     try:
         if provider == "ollama":
             import ollama
-            client = ollama.Client(host=host)
+            client_args = {'host': host}
+            if api_key:
+                client_args['headers'] = {'Authorization': f'Bearer {api_key}'}
+            client = ollama.Client(**client_args)
             return [m['name'] for m in client.list()['models']]
         elif provider == "openai":
             from openai import OpenAI
@@ -35,13 +43,177 @@ def fetch_models(provider, api_key=None, host=None):
              from google import genai
              client = genai.Client(api_key=api_key)
              return [m.name for m in client.models.list()]
-        elif provider == "custom_openai_compatible":
+        elif provider == "openai_compatible":
             from openai import OpenAI
             client = OpenAI(api_key=api_key, base_url=host)
             return [m.id for m in client.models.list()]
     except Exception as e:
-        return [f"Error fetching models: {e}"]
+        # typer.secho(f"Debug: {e}", fg=typer.colors.RED)
+        return []
     return []
+
+def load_existing_config(base_dir: Path):
+    for ext in ['toml', 'yaml', 'json']:
+        config_path = base_dir / f"config.{ext}"
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    if ext == 'toml':
+                        return toml.load(f), ext
+                    elif ext == 'yaml':
+                        return yaml.safe_load(f), ext
+                    elif ext == 'json':
+                        return json.load(f), ext
+            except Exception as e:
+                typer.secho(f"Error loading existing config: {e}", fg=typer.colors.RED)
+    return {}, None
+
+def configure_provider(provider_type: str = None, nickname: str = None, current_config: dict = None):
+    """
+    Helper to configure a provider (either main or named).
+    Returns a tuple (config_dict, api_key_info_dict, env_var_name)
+    """
+    # Standard list for listing purposes
+    KNOWN_PROVIDERS = ["ollama", "ollama_cloud", "openai", "google", "groq", "openai_compatible"]
+    
+    current_config = current_config or {}
+    
+    # Pre-calculate defaults
+    default_provider = current_config.get('provider', 'ollama')
+    
+    if not provider_type:
+        typer.echo(f"Known providers: {', '.join(KNOWN_PROVIDERS)}")
+        while True:
+            # If nickname is provided, the prompt should reflect that we are configuring that profile
+            prompt_text = f"Provider Type for '{nickname}'" if nickname else "Provider"
+            provider_input = typer.prompt(prompt_text, default=default_provider)
+            
+            # Map user input 'custom' to 'openai_compatible'
+            if provider_input == "custom":
+                 provider_type = "openai_compatible"
+                 break
+            
+            # Check if input is a known standard provider
+            if provider_input in KNOWN_PROVIDERS:
+                provider_type = provider_input
+                break
+            
+            # If not known, we handle it based on whether it's a named provider (nickname) scenario or not.
+            # But here we are selecting the TYPE.
+            # If the user typed something unknown, we warn and ask for clarification.
+            
+            typer.secho(f"Warning: '{provider_input}' is not a standard provider type.", fg=typer.colors.YELLOW)
+            
+            # Offer selection between the flexible types: ollama or openai_compatible
+            if typer.confirm(f"Is '{provider_input}' an OpenAI compatible provider?", default=True):
+                 provider_type = "openai_compatible"
+                 break
+            elif typer.confirm(f"Is '{provider_input}' an Ollama provider?", default=False):
+                 provider_type = "ollama"
+                 break
+            
+            # If they say no to both, loop again? Or allow it as is (risky)?
+            # Let's loop again to force a valid selection or valid type.
+            typer.secho("Please select a valid provider type.", fg=typer.colors.RED)
+    
+    # Handle ollama_cloud alias
+    final_provider_type = provider_type
+    if provider_type == 'ollama_cloud':
+        final_provider_type = 'ollama'
+
+    provider_config = {'provider': final_provider_type}
+    
+    # Host Prompt & Validation
+    temp_host = None
+    default_host = current_config.get('host')
+    
+    if final_provider_type == "ollama":
+        if not default_host:
+             default_host = "ollama_cloud" if provider_type == "ollama_cloud" else "http://localhost:11434"
+        
+        while True:
+            temp_host = typer.prompt("Ollama Host URL", default=default_host)
+            if validate_url(temp_host):
+                provider_config['host'] = temp_host
+                break
+            typer.secho("Invalid URL. Please enter a valid HTTP/HTTPS URL or 'ollama_cloud'.", fg=typer.colors.RED)
+            
+    elif final_provider_type == "openai_compatible":
+         while True:
+            temp_host = typer.prompt("Host URL", default=default_host if default_host else "")
+            if validate_url(temp_host):
+                provider_config['host'] = temp_host
+                break
+            typer.secho("Invalid URL. Please enter a valid HTTP/HTTPS URL.", fg=typer.colors.RED)
+
+    # Model Listing Option
+    temp_api_key = None
+    env_var_name = None
+    
+    if nickname:
+        env_var_name = f"{nickname.upper()}_API_KEY"
+        key_prompt_msg = f"API Key for {nickname} ({env_var_name})"
+    else:
+         key_map = {
+            "openai": "OPENAI_API_KEY",
+            "groq": "GROQ_API_KEY",
+            "google": "GOOGLE_API_KEY",
+            "openai_compatible": "CUSTOM_API_KEY",
+            "ollama": "OLLAMA_API_KEY"
+        }
+         env_var_name = key_map.get(final_provider_type, "API_KEY")
+         key_prompt_msg = f"{env_var_name}"
+
+    # If existing config has api_key, we generally don't show it, 
+    # but we might want to check connectivity.
+    
+    models_list = []
+    if typer.confirm("Do you want to list available models? (May require API Key)", default=False):
+        if final_provider_type == "ollama":
+             if typer.confirm("Does your Ollama instance require an API Key?", default=False):
+                 temp_api_key = get_masked_input(key_prompt_msg)
+        elif final_provider_type in KNOWN_PROVIDERS or final_provider_type == "openai_compatible": 
+             temp_api_key = get_masked_input(key_prompt_msg)
+        
+        models_list = fetch_models(final_provider_type, api_key=temp_api_key, host=temp_host)
+        if models_list:
+            typer.secho("Available Models:", fg=typer.colors.GREEN)
+            for i, m in enumerate(models_list, 1):
+                typer.echo(f" {i}. {m}")
+        else:
+            typer.secho("No models found or error occurred.", fg=typer.colors.RED)
+
+    default_model = current_config.get('model', "qwen3")
+    if not current_config.get('model'):
+        if final_provider_type == "openai": default_model = "gpt-3.5-turbo"
+        elif final_provider_type == "groq": default_model = "qwen/qwen3-32b"
+        elif final_provider_type == "google": default_model = "gemini-1.5-pro"
+    
+    while True:
+        model_name_input = get_input_with_default("Model Name (or number)", default_model)
+        
+        # Check if input is a number and matches list
+        if models_list and model_name_input.isdigit():
+            idx = int(model_name_input)
+            if 1 <= idx <= len(models_list):
+                model_name = models_list[idx - 1]
+                typer.secho(f"Selected model: {model_name}", fg=typer.colors.CYAN)
+            else:
+                typer.secho("Invalid model number.", fg=typer.colors.RED)
+                continue
+        else:
+            model_name = model_name_input
+
+        if model_name.strip():
+            provider_config['model'] = model_name
+            break
+        typer.secho("Model name cannot be empty.", fg=typer.colors.YELLOW)
+
+    api_key_info = None
+    if temp_api_key:
+        api_key_info = {'name': env_var_name, 'value': temp_api_key}
+
+    return provider_config, api_key_info, env_var_name
 
 def interactive_config():
     typer.secho("CommitCraft Configuration Wizard", fg=typer.colors.GREEN, bold=True)
@@ -54,129 +226,168 @@ def interactive_config():
             break
         typer.secho("Invalid scope. Please choose 'project' or 'global'.", fg=typer.colors.YELLOW)
     
-    # Format
-    while True:
-        file_format = typer.prompt("Configuration Format (toml/yaml/json)", default="toml").lower()
-        if file_format in ['toml', 'yaml', 'json']:
-            break
-        typer.secho("Invalid format. Please choose 'toml', 'yaml', or 'json'.", fg=typer.colors.YELLOW)
+    # Determine base directory
+    if is_global:
+        base_dir = Path(typer.get_app_dir("commitcraft"))
+    else:
+        base_dir = Path.cwd() / ".commitcraft"
+    
+    if not base_dir.exists():
+        base_dir.mkdir(parents=True, exist_ok=True)
 
+    # Load Existing Config
+    existing_config, detected_format = load_existing_config(base_dir)
+    is_edit_mode = bool(detected_format)
+    
+    if is_edit_mode:
+        typer.secho(f"Existing configuration found ({detected_format}). Entering edit mode.", fg=typer.colors.CYAN)
+        file_format = detected_format
+    else:
+        # Format
+        while True:
+            file_format = typer.prompt("Configuration Format (toml/yaml/json)", default="toml").lower()
+            if file_format in ['toml', 'yaml', 'json']:
+                break
+            typer.secho("Invalid format. Please choose 'toml', 'yaml', or 'json'.", fg=typer.colors.YELLOW)
+
+    # Initialize / Merge Config
     config = {
-        "context": {},
-        "models": {},
-        "emoji": {}
+        "context": existing_config.get('context', {}),
+        "models": existing_config.get('models', {}),
+        "emoji": existing_config.get('emoji', {}),
+        "providers": existing_config.get('providers', {})
     }
 
     # Context
     typer.secho("\n[Project Context]", fg=typer.colors.BLUE)
     if not is_global:
-        config['context']['project_name'] = get_input_with_default("Project Name", "")
-        config['context']['project_language'] = get_input_with_default("Project Language", "")
-        config['context']['project_description'] = get_input_with_default("Project Description", "")
+        config['context']['project_name'] = get_input_with_default("Project Name", config['context'].get('project_name', ""))
+        config['context']['project_language'] = get_input_with_default("Project Language", config['context'].get('project_language', ""))
+        config['context']['project_description'] = get_input_with_default("Project Description", config['context'].get('project_description', ""))
     
     # Commit Guidelines
+    existing_guidelines = config['context'].get('commit_guidelines', default['commit_guidelines'])
+    current_guidelines_preview = existing_guidelines[:50] + "..." if existing_guidelines and len(existing_guidelines) > 50 else existing_guidelines
+    
     while True:
-        choice = typer.prompt("Commit Guidelines (default/custom/view/skip)", default="default").lower()
+        prompt_msg = f"Commit Guidelines (default/custom/view/skip/keep)" if is_edit_mode else "Commit Guidelines (default/custom/view/skip)"
+        choice = typer.prompt(prompt_msg, default="keep" if is_edit_mode else "default").lower()
+        
         if choice == "view":
-            typer.echo(default['commit_guidelines'])
+            typer.echo(existing_guidelines)
         elif choice == "default":
             config['context']['commit_guidelines'] = default['commit_guidelines']
             break
         elif choice == "custom":
-            config['context']['commit_guidelines'] = typer.prompt("Enter your custom commit guidelines")
+            config['context']['commit_guidelines'] = typer.prompt("Enter your custom commit guidelines", default=existing_guidelines)
             break
         elif choice == "skip":
             config['context']['commit_guidelines'] = ""
             break
+        elif choice == "keep" and is_edit_mode:
+            break # Keep existing
         else:
             typer.secho("Invalid choice.", fg=typer.colors.YELLOW)
 
-    # Models
-    typer.secho("\n[Model Settings]", fg=typer.colors.BLUE)
+    # Models (Main Default Provider)
+    typer.secho("\n[Default Model Settings]", fg=typer.colors.BLUE)
     
-    KNOWN_PROVIDERS = ["ollama", "openai", "google", "groq", "custom_openai_compatible"]
-    typer.echo(f"Known providers: {', '.join(KNOWN_PROVIDERS)}")
-    
-    while True:
-        provider_input = typer.prompt("Provider", default="ollama")
-        if provider_input == "custom":
-             provider = "custom_openai_compatible"
-             break
-        elif provider_input not in KNOWN_PROVIDERS:
-            typer.secho(f"Warning: '{provider_input}' is not a standard provider.", fg=typer.colors.YELLOW)
-            if typer.confirm("Treat as custom OpenAI compatible provider?", default=True):
-                provider = "custom_openai_compatible"
-                # We save the custom name? The config structure expects specific provider keys or enums?
-                # The LModel class uses enum. We must stick to enum values for internal config 'provider' field
-                # but maybe we can note the custom name elsewhere or just treat it as custom_openai_compatible.
-                # For now, we map to the enum value.
-                break
-            else:
-                # If they insist on the name but it's not supported, the tool might fail later. 
-                # Let's just allow it but warn.
-                provider = provider_input
-                break
-        else:
-            provider = provider_input
-            break
+    env_keys_to_save = {}
+    main_env_var = None
 
-    config['models']['provider'] = provider
+    should_configure_main = True
+    if is_edit_mode and config['models']:
+        if not typer.confirm("Edit default provider settings?", default=False):
+            should_configure_main = False
     
-    # Host Prompt & Validation
-    temp_host = None
-    if provider == "ollama":
-        while True:
-            temp_host = typer.prompt("Ollama Host URL", default="http://localhost:11434")
-            if validate_url(temp_host):
-                config['models']['host'] = temp_host
-                break
-            typer.secho("Invalid URL. Please enter a valid HTTP/HTTPS URL.", fg=typer.colors.RED)
+    if should_configure_main:
+        main_config, main_key_info, main_env_var = configure_provider(current_config=config['models'])
+        config['models'] = main_config
+        if main_key_info:
+            env_keys_to_save[main_key_info['name']] = main_key_info['value']
+    else:
+        # We need to know the env var name for the existing provider to offer saving it? 
+        # Maybe skip if not editing.
+        pass
+
+    # Named Providers
+    typer.secho("\n[Additional Providers]", fg=typer.colors.BLUE)
+    
+    # Edit existing named providers
+    if config['providers']:
+        for nickname in list(config['providers'].keys()):
+            # Using prompt instead of confirm to allow 'delete'
+            action = typer.prompt(f"Manage provider profile '{nickname}'? (edit/delete/keep)", default="keep").lower()
             
-    elif provider == "custom_openai_compatible":
-         while True:
-            temp_host = typer.prompt("Host URL")
-            if validate_url(temp_host):
-                config['models']['host'] = temp_host
+            if action == "delete":
+                del config['providers'][nickname]
+                typer.secho(f"Profile '{nickname}' marked for deletion.", fg=typer.colors.YELLOW)
+            elif action == "edit":
+                p_config, p_key_info, p_env_var = configure_provider(nickname=nickname, current_config=config['providers'][nickname])
+                config['providers'][nickname] = p_config
+                if p_key_info:
+                    env_keys_to_save[p_key_info['name']] = p_key_info['value']
+            # else keep/skip
+
+    if typer.confirm("Do you want to add/configure additional providers?", default=False):
+        while True:
+            KNOWN_PROVIDERS = ["ollama", "ollama_cloud", "openai", "google", "groq", "openai_compatible"]
+            typer.echo(f"Known providers: {', '.join(KNOWN_PROVIDERS)}")
+            
+            # 1. Ask for Provider Type
+            p_type = typer.prompt("Select Provider Type", default="ollama")
+            
+            # Map 'custom' to 'openai_compatible' for user convenience if they type it
+            if p_type == "custom": p_type = "openai_compatible"
+            
+            # Validation logic
+            if p_type not in KNOWN_PROVIDERS:
+                 typer.secho(f"Warning: '{p_type}' is not a standard provider.", fg=typer.colors.YELLOW)
+                 if typer.confirm(f"Is '{p_type}' an OpenAI compatible provider?", default=True):
+                      p_type = "openai_compatible"
+                 elif typer.confirm(f"Is '{p_type}' an Ollama provider?", default=False):
+                      p_type = "ollama"
+                 else:
+                      typer.secho("Please select a valid provider type.", fg=typer.colors.RED)
+                      continue
+            
+            # 2. Determine Nickname
+            nickname = p_type # Default nickname is the provider type
+            
+            if p_type in ['ollama', 'ollama_cloud']:
+                 # Always ask for nickname for ollama, defaulting to 'ollama'
+                 nickname = typer.prompt("Profile Nickname", default="ollama")
+            elif p_type == "openai_compatible":
+                 # Must have a nickname for generic compatible providers
+                 nickname = typer.prompt("Profile Nickname (e.g. deepseek, litellm)", default="openai_compatible")
+            
+            # Check if exists
+            current_p_config = config['providers'].get(nickname)
+            if current_p_config:
+                if not typer.confirm(f"Profile '{nickname}' already exists. Overwrite?", default=True):
+                    continue
+            
+            # 3. Configure
+            p_config, p_key_info, p_env_var = configure_provider(provider_type=p_type, nickname=nickname, current_config=current_p_config)
+            config['providers'][nickname] = p_config
+            
+            if p_key_info:
+                env_keys_to_save[p_key_info['name']] = p_key_info['value']
+            
+            if not p_key_info and p_env_var:
+                 if typer.confirm(f"Do you want to save the API key for '{nickname}' ({p_env_var}) now?", default=True):
+                      val = get_masked_input(p_env_var)
+                      env_keys_to_save[p_env_var] = val
+
+            if not typer.confirm("Add another provider?", default=False):
                 break
-            typer.secho("Invalid URL. Please enter a valid HTTP/HTTPS URL.", fg=typer.colors.RED)
-
-    # Model Listing Option
-    temp_api_key = None
-    if typer.confirm("Do you want to list available models? (May require API Key)", default=False):
-        if provider in ["openai", "groq", "google", "custom_openai_compatible"]:
-            key_name = {
-                "openai": "OPENAI_API_KEY",
-                "groq": "GROQ_API_KEY",
-                "google": "GOOGLE_API_KEY",
-                "custom_openai_compatible": "CUSTOM_API_KEY"
-            }.get(provider, "API_KEY") # Fallback for unknown provider
-            temp_api_key = typer.prompt(key_name, hide_input=True)
-        
-        models_list = fetch_models(provider, api_key=temp_api_key, host=temp_host)
-        if models_list:
-            typer.secho("Available Models:", fg=typer.colors.GREEN)
-            for m in models_list:
-                typer.echo(f" - {m}")
-        else:
-            typer.secho("No models found or error occurred.", fg=typer.colors.RED)
-
-    default_model = "qwen3"
-    if provider == "openai": default_model = "gpt-3.5-turbo"
-    elif provider == "groq": default_model = "qwen/qwen3-32b"
-    elif provider == "google": default_model = "gemini-1.5-pro"
-    
-    while True:
-        model_name = get_input_with_default("Model Name", default_model)
-        if model_name.strip():
-            config['models']['model'] = model_name
-            break
-        typer.secho("Model name cannot be empty.", fg=typer.colors.YELLOW)
 
     # Emoji
     typer.secho("\n[Emoji Settings]", fg=typer.colors.BLUE)
     if typer.confirm("Enable Emojis?", default=True):
+        current_emoji_conv = config['emoji'].get('emoji_convention', 'simple')
         while True:
-            choice = typer.prompt("Emoji Convention (simple/full/custom/view)", default="simple").lower()
+            choice = typer.prompt("Emoji Convention (simple/full/custom/view)", default=current_emoji_conv).lower()
             if choice == "view":
                 typer.secho("Simple Convention:", fg=typer.colors.GREEN)
                 typer.echo(default['emoji_guidelines']['simple'])
@@ -186,32 +397,20 @@ def interactive_config():
                 config['emoji']['emoji_convention'] = choice
                 break
             elif choice == "custom":
-                config['emoji']['emoji_convention'] = typer.prompt("Enter your custom emoji convention")
+                config['emoji']['emoji_convention'] = typer.prompt("Enter your custom emoji convention", default=current_emoji_conv)
                 break
             else:
                 typer.secho("Invalid choice.", fg=typer.colors.YELLOW)
         
         config['emoji']['emoji_steps'] = "single"
+    else:
+        config['emoji'] = {} # Clear if disabled? or just don't use it.
 
     # Save Config
-    if is_global:
-        base_dir = Path(typer.get_app_dir("commitcraft"))
-    else:
-        base_dir = Path.cwd() / ".commitcraft"
-    
-    if not base_dir.exists():
-        base_dir.mkdir(parents=True, exist_ok=True)
-        
     file_path = base_dir / f"config.{file_format}"
     
-    write_mode = 'w'
-    if file_path.exists():
-        if not typer.confirm(f"File {file_path} exists. Overwrite?", default=False):
-            typer.secho("Operation cancelled.", fg=typer.colors.RED)
-            return
-    
     try:
-        with open(file_path, write_mode) as f:
+        with open(file_path, 'w') as f:
             if file_format == 'toml':
                 toml.dump(config, f)
             elif file_format == 'yaml':
@@ -223,69 +422,53 @@ def interactive_config():
         typer.secho(f"Error saving configuration: {e}", fg=typer.colors.RED)
         
     # API Keys (.env) handling
-    if provider in ["openai", "groq", "google", "custom_openai_compatible"]:
-        typer.secho("\n[API Keys]", fg=typer.colors.BLUE)
-        if typer.confirm("Do you want to configure API keys in a .env file?", default=True):
-            env_path = Path.cwd() / ".env"
-            keys = {}
-            
-            # Use previously entered key as default if available? 
-            # Typer prompt doesn't strictly support pre-filling hidden input easily without default=...
-            # But we can check if we have it.
-            
-            if provider == "openai":
-                if temp_api_key:
-                     if typer.confirm("Use the API key provided earlier?", default=True):
-                         keys["OPENAI_API_KEY"] = temp_api_key
-                     else:
-                         keys["OPENAI_API_KEY"] = typer.prompt("OPENAI_API_KEY", hide_input=True)
-                else:
-                    keys["OPENAI_API_KEY"] = typer.prompt("OPENAI_API_KEY", hide_input=True)
-            elif provider == "groq":
-                if temp_api_key:
-                     if typer.confirm("Use the API key provided earlier?", default=True):
-                         keys["GROQ_API_KEY"] = temp_api_key
-                     else:
-                         keys["GROQ_API_KEY"] = typer.prompt("GROQ_API_KEY", hide_input=True)
-                else:
-                    keys["GROQ_API_KEY"] = typer.prompt("GROQ_API_KEY", hide_input=True)
-            elif provider == "google":
-                if temp_api_key:
-                     if typer.confirm("Use the API key provided earlier?", default=True):
-                         keys["GOOGLE_API_KEY"] = temp_api_key
-                     else:
-                         keys["GOOGLE_API_KEY"] = typer.prompt("GOOGLE_API_KEY", hide_input=True)
-                else:
-                    keys["GOOGLE_API_KEY"] = typer.prompt("GOOGLE_API_KEY", hide_input=True)
-            elif provider == "custom_openai_compatible":
-                if temp_api_key:
-                     if typer.confirm("Use the API key provided earlier?", default=True):
-                         keys["CUSTOM_API_KEY"] = temp_api_key
-                     else:
-                         keys["CUSTOM_API_KEY"] = typer.prompt("CUSTOM_API_KEY", hide_input=True)
-                else:
-                    keys["CUSTOM_API_KEY"] = typer.prompt("CUSTOM_API_KEY", hide_input=True)
-                
-            if keys:
-                # Simple .env writer that doesn't duplicate existing keys would be better,
-                # but for now appends or writes.
-                # Let's read existing to avoid duplicates if possible, or just append.
-                # Append is safer than full overwrite.
-                
-                # Check if key exists
-                existing_lines = []
-                if env_path.exists():
-                    with open(env_path, 'r') as f:
-                        existing_lines = f.readlines()
-                
-                with open(env_path, 'a') as f:
-                    if existing_lines and not existing_lines[-1].endswith('\n'):
-                        f.write("\n")
-                    for k, v in keys.items():
-                        # Check if already present (rudimentary check)
-                        if not any(line.strip().startswith(f"{k}=") for line in existing_lines):
-                             f.write(f"{k}={v}\n")
-                        else:
-                             typer.secho(f"Key {k} already exists in .env, skipping.", fg=typer.colors.YELLOW)
+    typer.secho("\n[API Keys]", fg=typer.colors.BLUE)
+    
+    # Check if main key is missing from our collection but needed
+    if main_env_var and main_env_var not in env_keys_to_save and should_configure_main:
+         if typer.confirm(f"Do you want to configure the default API key ({main_env_var}) in .env?", default=True):
+             val = get_masked_input(main_env_var)
+             env_keys_to_save[main_env_var] = val
 
-                typer.secho(f"API keys process finished for {env_path}", fg=typer.colors.GREEN)
+    if env_keys_to_save:
+        typer.secho("Keys to be saved:", fg=typer.colors.CYAN)
+        for k in env_keys_to_save:
+            typer.echo(f" - {k}")
+        
+        # Ask where to save
+        choices = [".env", "CommitCraft.env", "skip"]
+        save_choice = typer.prompt(
+            "Where do you want to save these keys?", 
+            default=".env", 
+            show_choices=True
+        )
+        
+        # Normalize input
+        if save_choice not in choices:
+            # Fallback or strict? Let's just try to match roughly or default to skip if invalid to be safe,
+            # or better, loop? Typer prompt doesn't loop automatically with custom strings unless we use click Choice or similar.
+            # But let's just handle text input.
+            if "commitcraft" in save_choice.lower(): save_choice = "CommitCraft.env"
+            elif "env" in save_choice.lower(): save_choice = ".env"
+            else: save_choice = "skip"
+
+        if save_choice != "skip":
+            env_path = Path.cwd() / save_choice
+            
+            existing_lines = []
+            if env_path.exists():
+                with open(env_path, 'r') as f:
+                    existing_lines = f.readlines()
+            
+            with open(env_path, 'a') as f:
+                if existing_lines and not existing_lines[-1].endswith('\n'):
+                    f.write("\n")
+                for k, v in env_keys_to_save.items():
+                    if not any(line.strip().startswith(f"{k}=") for line in existing_lines):
+                            f.write(f"{k}={v}\n")
+                    else:
+                            typer.secho(f"Key {k} already exists in {save_choice}, skipping.", fg=typer.colors.YELLOW)
+
+            typer.secho(f"API keys process finished for {env_path}", fg=typer.colors.GREEN)
+    else:
+        typer.secho("No API keys to save.", fg=typer.colors.YELLOW)
