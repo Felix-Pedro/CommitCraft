@@ -619,8 +619,8 @@ HOOK_VERSION="{package_version}"
 INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
-    echo "⚠️  CommitCraft hook is outdated (hook: $HOOK_VERSION, installed: $INSTALLED_VERSION)" >&2
-    echo "   Update with: {update_command}" >&2
+    printf "\\033[1;33m⚠️  CommitCraft hook is outdated\\033[0m \\033[2m(hook: \\033[1;31m%s\\033[0m\\033[2m, installed: \\033[1;32m%s\\033[0m\\033[2m)\\033[0m\\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
+    printf "   \\033[1;36mUpdate with:\\033[0m \\033[1;97m{update_command}\\033[0m\\n" >&2
     echo "" >&2
 fi
 
@@ -729,8 +729,8 @@ HOOK_VERSION="{package_version}"
 INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
-    echo "⚠️  CommitCraft hook is outdated (hook: $HOOK_VERSION, installed: $INSTALLED_VERSION)" >&2
-    echo "   Update with: {update_command}" >&2
+    printf "\\033[1;33m⚠️  CommitCraft hook is outdated\\033[0m \\033[2m(hook: \\033[1;31m%s\\033[0m\\033[2m, installed: \\033[1;32m%s\\033[0m\\033[2m)\\033[0m\\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
+    printf "   \\033[1;36mUpdate with:\\033[0m \\033[1;97m{update_command}\\033[0m\\n" >&2
     echo "" >&2
 fi
 
