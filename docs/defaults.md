@@ -7,22 +7,22 @@ This page documents all default values used by CommitCraft, defined in `src/comm
 CommitCraft uses the following guidelines by default when generating commit messages:
 
 ```
-- Never ask for folow-up questions.
-- Don't ask quetions.
+- Never ask for follow-up questions.
+- Don't ask questions.
 - Don't talk about yourself.
 - Be concise and clear.
 - Be informative.
 - Don't explain row by row just the global goal of the changes.
-- Avoid unecessary details and long explanations.
+- Avoid unnecessary details and long explanations.
 - Use action verbs.
 - Use bullet points in the body if there are many changes
 - Do not talk about the hashes.
 - Create concise and comprehensive commit messages.
-- Be direct about what changed and why. Focous on what.
-- Give a small summary of what has changed and how it may afect the rest of the project.
-- Do not return any explanation other then the commit message itself.
-- If there are many changes focous on the main ones.
-- The first row shall be te title of your message, so make it simple and informative.
+- Be direct about what changed and why. Focus on what.
+- Give a small summary of what has changed and how it may affect the rest of the project.
+- Do not return any explanation other than the commit message itself.
+- If there are many changes focus on the main ones.
+- The first row shall be the title of your message, so make it simple and informative.
 - Do not introduce your message!
 ```
 
@@ -39,7 +39,7 @@ You are a commit message helper {% if project_name or project_language %} for {{
 
 {{ project_description }}
 
-{% else %}.
+{% else %}. 
 {% endif %}
 Your only task is to receive a git diff and maybe some clues, then return a simple commit message following these guidelines:
 
@@ -83,18 +83,18 @@ When using CommitClues without descriptions, these defaults are used:
 
 | Clue Flag | Default Description |
 | :--- | :--- |
-| `--bug` | "This commit focous on fixing a bug" |
-| `--feat` | "This commit focous on a new feature" |
-| `--docs` | "This commit focous on docs" |
-| `--refact` | "This commit focous on refactoring" |
+| `--bug` | "This commit focus on fixing a bug" |
+| `--feat` | "This commit focus on a new feature" |
+| `--docs` | "This commit focus on docs" |
+| `--refact` | "This commit focus on refactoring" |
 
 **Example:**
 ```bash
 CommitCraft --bug
-# Adds: "This commit focous on fixing a bug"
+# Adds: "This commit focus on fixing a bug"
 
 CommitCraft --feat-desc "Added OAuth"
-# Adds: "This commit focous on a new feature: Added OAuth"
+# Adds: "This commit focus on a new feature: Added OAuth"
 ```
 
 ---
@@ -196,7 +196,7 @@ The title shall be formated as "{emoji} {title}"
 When using `emoji_steps = "2-step"`, a second AI call is made with this prompt:
 
 ```
-Your mission is to recive a commit message and return an emoji based on the folowing guide.
+Your mission is to receive a commit message and return an emoji based on the following guide.
 Do not explain yourself, return only the single emoji.
 ```
 

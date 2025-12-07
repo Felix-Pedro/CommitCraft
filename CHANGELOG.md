@@ -7,11 +7,18 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [unreleased]
 
+No unreleased changes yet.
+
+---
+
+## [1.0.0] - 2025-12-07
+
 ### Added
+
+- **Use Global Model Settings**: Added option in interactive config to skip project-specific model configuration and use global settings instead. When configuring a project-level config, users are now prompted "Configure project-specific model settings? (No = use global settings)" allowing projects to inherit model settings from the global configuration.
 
 - **Ollama Cloud**: Added native support for `ollama_cloud` provider using the official chat API with proper authentication to `https://ollama.com`.
 - **Multi-Provider Management**: Enhanced interactive config to add, edit, and delete additional provider profiles.
-- **Improved UI**: Model selection now supports choosing by index number, and API key inputs show visual feedback (`***`) using `rich`.
 - **Debug Mode**: Added `--debug-prompt` option to inspect prompts without sending requests to the model.
 - Named provider environment variables now use `NICKNAME_API_KEY` format (e.g., `LITELLM_API_KEY`) instead of `PROVIDER_NICKNAME_API_KEY`.
 - Introducing : **CommitClues**, a simple way to help your model get a little bit more specific context.
@@ -54,6 +61,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 ### Fixed
 
 - Fixed help messages not respecting `NO_COLOR` environment variable.
+- **Click 8.3+ Compatibility**: Pinned `click` to versions `>=8.1.0,<8.2.0` to avoid incompatibility with Click 8.3.0+'s stricter validation of boolean flags. Click 8.3+ introduced breaking changes that caused `TypeError: Secondary flag is not valid for non-boolean flag` errors. All boolean CLI options now explicitly specify `is_flag=True` for forward compatibility.
 
 ### Removed
 
@@ -79,6 +87,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - GitMoji prompt.
 - Default system prompt.
 
-[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/latest...HEAD
+[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Felix-Pedro/CommitCraft/releases/tag/v0.1.0
