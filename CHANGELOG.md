@@ -21,6 +21,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - **Colorful Help Messages**: Added Rich markup to help text for colorful, easy-to-read CLI help output.
 - **Plain Output Mode**: Added `--no-color` / `-p` / `--plain` flags to disable colored output for piping/scripting.
 - Forced color support by default to fix color detection issues in zsh and other shells.
+- **Fun Loading Messages**: Added randomized funny programming and AI jokes to the commit generation loading spinner. Messages rotate every 3 seconds during longer operations.
 
 ### Changed
 
