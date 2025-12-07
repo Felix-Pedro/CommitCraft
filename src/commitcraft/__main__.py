@@ -68,7 +68,7 @@ def load_config():
     """Load configuration from Global and Project levels and merge them."""
     
     # 1. Global Level
-    global_dir = os.path.join(os.path.expanduser("~"), ".commitcraft")
+    global_dir = typer.get_app_dir("commitcraft")
     global_config = load_config_from_dir(global_dir)
 
     # 2. Project Level
