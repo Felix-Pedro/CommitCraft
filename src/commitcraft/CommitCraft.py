@@ -1,44 +1,54 @@
-import subprocess
-import os
 import fnmatch
-from .defaults import default
+import os
+import subprocess
 from enum import Enum
-from typing import List
-from pydantic import BaseModel, conint, Extra, root_validator, HttpUrl
-from typing import Optional
+from typing import List, Optional, Union, Literal
+
 from jinja2 import Template
+from pydantic import BaseModel, Extra, HttpUrl, conint, root_validator
+
+from .defaults import default
+
 
 # Custom exceptions to be raised when using custom_openai_compatible provider.
 class MissingModelError(ValueError):
     def __init__(self):
-        self.message = "The model cannot be None for the 'custom_openai_compatible' provider."
+        self.message = (
+            "The model cannot be None for the 'openai_compatible' provider."
+        )
         super().__init__(self.message)
+
 
 class MissingHostError(ValueError):
     def __init__(self):
-        self.message = "The 'host' field is required and must be a valid URL when using the 'custom_openai_compatible' provider."
+        self.message = "The 'host' field is required and must be a valid URL when using the 'openai_compatible' provider."
         super().__init__(self.message)
+
 
 def get_diff() -> str:
     """Retrieve the staged changes in the git repository."""
-    diff = subprocess.run(['git', 'diff', '--staged', '-M'], capture_output=True, text=True)
+    diff = subprocess.run(
+        ["git", "diff", "--staged", "-M"], capture_output=True, text=True
+    )
     return diff.stdout
 
-def matches_pattern(file_path : str, ignored_patterns : List[str]) -> bool:
+
+def matches_pattern(file_path: str, ignored_patterns: List[str]) -> bool:
     """Check if the file matches any of the ignore patterns using fnmatch"""
     for pattern in ignored_patterns:
         if fnmatch.fnmatch(file_path, pattern):
             return True
     return False
 
-def filter_diff(diff_output : str, ignored_patterns : List):
+
+def filter_diff(diff_output: str, ignored_patterns: List):
     """Filters the diff output to exclude files listed in ignored_files."""
     filtered_diff = []
     in_diff_block = False
     current_file = None
 
     for line in diff_output.splitlines():
-        if line.startswith('diff --git'):
+        if line.startswith("diff --git"):
             in_diff_block = False
             # Extract the file path from the line, typically it comes after b/
             # Example: diff --git a/file.txt b/file.txt
@@ -52,85 +62,100 @@ def filter_diff(diff_output : str, ignored_patterns : List):
         if in_diff_block:
             filtered_diff.append(line)
 
-    return '\n'.join(filtered_diff)
+    return "\n".join(filtered_diff)
 
-def get_context_size(diff : str, system : str) -> int:
+
+def get_context_size(diff: str, system: str) -> int:
     """Based on the git diff and system prompt estimate ollama context window needed"""
     input_len = len(system) + len(diff)
-    num_ctx = int(min(max(input_len*2.64, 1024), 128000))
+    num_ctx = int(min(max(input_len * 2.64, 1024), 128000))
     return num_ctx
 
 
 class EmojiSteps(Enum):
     """If emoji should be performed in the same step as the message or in a separated one"""
-    single = 'single'
-    step2 = '2-step'
+
+    single = "single"
+    step2 = "2-step"
     false = False
 
 
 class LModelOptions(BaseModel):
     """The options for the LLM"""
+
     num_ctx: Optional[int] = None
     temperature: Optional[float] = None
-    max_tokens: Optional[conint(ge=1)] = None  # Ensure max_tokens is a positive integer if provided
+    max_tokens: Optional[conint(ge=1)] = (
+        None  # Ensure max_tokens is a positive integer if provided
+    )
 
     class Config:
-        extra = Extra.allow # Allows for extra arguments
+        extra = Extra.allow  # Allows for extra arguments
+
 
 class Provider(str, Enum):
     """The supported LLM Providers"""
-    ollama = 'ollama'
-    openai = 'openai'
-    google = 'google'
-    groq = 'groq'
-    oai_custom = 'custom_openai_compatible'
+
+    ollama = "ollama"
+    ollama_cloud = "ollama_cloud"
+    openai = "openai"
+    google = "google"
+    groq = "groq"
+    openai_compatible = "openai_compatible"
+
 
 class LModel(BaseModel):
     """The model object containin the provider, model name, system prompt, option and host"""
+
     provider: Provider = Provider.ollama
-    model: Optional[str] = None # Most providers have default, required for custom_openai_compatible
+    model: Optional[str] = (
+        None  # Most providers have default, required for openai_compatible
+    )
     system_prompt: Optional[str] = None
     options: Optional[LModelOptions] = None
-    host: Optional[HttpUrl] = None  # required for custom_openai_compatible
+    host: Optional[Union[Literal["ollama_cloud"], HttpUrl]] = None  # required for openai_compatible
+    api_key: Optional[str] = None
 
     @root_validator(pre=True)
     def set_model_default(cls, values):
         # If 'model' is not provided, set it based on 'provider'
-        provider = values.get('provider')
-        if 'model' not in values or values['model'] is None:
-            if provider == Provider.ollama:
-                values['model'] = 'qwen3'
+        provider = values.get("provider")
+        if "model" not in values or values["model"] is None:
+            if provider == Provider.ollama or provider == Provider.ollama_cloud:
+                values["model"] = "qwen3"
             if provider == Provider.groq:
-                values['model'] = 'qwen/qwen3-32b'
+                values["model"] = "qwen/qwen3-32b"
             elif provider == Provider.google:
-                values['model'] = 'gemini-2.5-pro'
+                values["model"] = "gemini-2.5-pro"
             elif provider == Provider.openai:
-                values['model'] = 'gpt-3.5-turbo'
+                values["model"] = "gpt-3.5-turbo"
         return values
 
         @root_validator(pre=True)
         def validate_provider_requirements(cls, values):
-            provider = values.get('provider')
+            provider = values.get("provider")
 
-            # Enforce that 'model' is not None when using custom_openai_compatible
-            if provider == Provider.oai_custom:
-                if not values.get('model'):
+            # Enforce that 'model' is not None when using openai_compatible
+            if provider == Provider.openai_compatible:
+                if not values.get("model"):
                     raise MissingModelError()
 
             return values
 
         @root_validator(pre=True)
         def check_host_for_oai_custom(cls, host, values):
-            provider = values.get('provider')
-            if provider == Provider.oai_custom and not host:
+            provider = values.get("provider")
+            if provider == Provider.openai_compatible and not host:
                 raise MissingHostError()
 
             return host
+
 
 class EmojiConfig(BaseModel):
     emoji_steps: EmojiSteps = EmojiSteps.single
     emoji_convention: str = "simple"
     emoji_model: Optional[LModel] = None
+
 
 class CommitCraftInput(BaseModel):
     diff: str
@@ -140,41 +165,48 @@ class CommitCraftInput(BaseModel):
     refact: str | bool = False
     custom_clue: str | bool = False
 
-def clue_parser(input : CommitCraftInput) -> dict[str, str | bool]:
+
+def clue_parser(input: CommitCraftInput) -> dict[str, str | bool]:
     clues_and_input = {}
     for key, value in input.dict().items():
         if value is True:
             clues_and_input[key] = default.get(key, key)
         else:
-            #if key == 'diff':
+            # if key == 'diff':
             #    clues_and_input['diff'] = value
             if value:
-                clues_and_input[key] = default.get(key, '') + (':' if default.get(key) else '') + value
+                clues_and_input[key] = (
+                    default.get(key, "") + (":" if default.get(key) else "") + value
+                )
             else:
                 pass
     return clues_and_input
 
+
 def commit_craft(
-    input : CommitCraftInput,
-    models : LModel = LModel(), # Will support multiple models in 1.1.0 but for now only one
-    context : dict[str, str] = {},
-    emoji : Optional[EmojiConfig] = None,
-    debug_prompt: bool = False
-
+    input: CommitCraftInput,
+    models: LModel = LModel(),  # Will support multiple models in 1.1.0 but for now only one
+    context: dict[str, str] = {},
+    emoji: Optional[EmojiConfig] = None,
+    debug_prompt: bool = False,
 ) -> str:
-    """CommitCraft generates a system message and requests a commit message based on staged changes """
+    """CommitCraft generates a system message and requests a commit message based on staged changes"""
 
-    system_prompt = models.system_prompt if models.system_prompt else default.get('system_prompt','')
+    system_prompt = (
+        models.system_prompt
+        if models.system_prompt
+        else default.get("system_prompt", "")
+    )
     system_prompt = Template(system_prompt)
     system_prompt = system_prompt.render(**context)
 
-    input_wrapper = Template(default.get('input', ''))
+    input_wrapper = Template(default.get("input", ""))
     input_data = clue_parser(input)
     prompt = input_wrapper.render(**input_data)
 
     if emoji:
         if emoji.emoji_steps == EmojiSteps.single:
-            if emoji.emoji_convention in ('simple', 'full'):
+            if emoji.emoji_convention in ("simple", "full"):
                 system_prompt += f"\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention, '')}"
             elif emoji.emoji_convention:
                 system_prompt += f"\n\n{emoji.emoji_convention}"
@@ -184,121 +216,159 @@ def commit_craft(
     if debug_prompt:
         return f"system_prompt:\n{system_prompt}\n\n prompt:\n{prompt}"
     match model.provider:
-        case "ollama":
+        case "ollama" | "ollama_cloud":
             import ollama
-            Ollama = ollama.Client(str(model.host) if model.host else os.getenv("OLLAMA_HOST"))
-            if 'num_ctx' in model_options.keys():
-                if model_options['num_ctx']:
+
+            # Ollama Client initialization with optional host and header for API key (if needed by some cloud providers or auth proxies)
+            # The standard python client might support headers or auth via host string or env vars.
+            # Assuming standard client usage:
+            client_args = {}
+            host_val = str(model.host) if model.host else os.getenv("OLLAMA_HOST")
+            if host_val:
+                client_args["host"] = host_val
+
+            # If there's an API key for Ollama (e.g. cloud), passing it might depend on the specific cloud or proxy.
+            # Official library might not expose 'api_key' param directly in constructor unless recent update.
+            # But checking docs or common patterns: often headers={'Authorization': 'Bearer ...'}
+            # For now, let's assume we can pass it if it exists in env.
+            ollama_api_key = (
+                model.api_key if model.api_key else os.getenv("OLLAMA_API_KEY")
+            )
+            if ollama_api_key:
+                # Some versions/proxies use headers
+                client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
+
+            Ollama = ollama.Client(**client_args)
+
+            if "num_ctx" in model_options.keys():
+                if model_options["num_ctx"]:
                     return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
                         prompt=prompt,
-                        options=model_options
-                    )['response']
+                        options=model_options,
+                    )["response"]
                 else:
-                    model_options['num_ctx'] = get_context_size(prompt, system_prompt)
+                    model_options["num_ctx"] = get_context_size(prompt, system_prompt)
                     return Ollama.generate(
                         model=model.model,
                         system=system_prompt,
                         prompt=prompt,
-                        options=model_options
-                    )['response']
+                        options=model_options,
+                    )["response"]
             else:
-                model_options['num_ctx'] = get_context_size(prompt, system_prompt)
+                model_options["num_ctx"] = get_context_size(prompt, system_prompt)
                 return Ollama.generate(
                     model=model.model,
                     system=system_prompt,
                     prompt=prompt,
-                    options=model_options
-                )['response']
+                    options=model_options,
+                )["response"]
 
         case "groq":
             from groq import Groq
-            client = Groq(api_key=os.getenv('GROQ_API_KEY'))
-            groq_configs = ('top_p','temperature', 'max_tokens')
-            groq_options = {config : model_options.get(config) if model_options.get(config) else None for config in (set(tuple(model_options.keys())) & set(groq_configs))}
-            return client.chat.completions.create(
-                messages=[
-                    {
-                        "role" : "system",
-                        "content" : system_prompt
-                    },
-                    {
-                        "role" : "user",
-                        "content" : prompt
-                    }
-                ],
-                model=model.model,
-                stream=False,
-                **groq_options
-            ).choices[0].message.content
 
-        case 'google':
+            client = Groq(
+                api_key=model.api_key if model.api_key else os.getenv("GROQ_API_KEY")
+            )
+            groq_configs = ("top_p", "temperature", "max_tokens")
+            groq_options = {
+                config: model_options.get(config) if model_options.get(config) else None
+                for config in (set(tuple(model_options.keys())) & set(groq_configs))
+            }
+            return (
+                client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    model=model.model,
+                    stream=False,
+                    **groq_options,
+                )
+                .choices[0]
+                .message.content
+            )
+
+        case "google":
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
+            client = genai.Client(
+                api_key=model.api_key if model.api_key else os.getenv("GOOGLE_API_KEY")
+            )
 
             google_config = {}
             if system_prompt:
-                google_config['system_instruction'] = system_prompt
+                google_config["system_instruction"] = system_prompt
 
             if model_options:
-                 if model_options.get('temperature'):
-                     google_config['temperature'] = model_options.get('temperature')
-                 if model_options.get('max_tokens'):
-                     google_config['max_output_tokens'] = model_options.get('max_tokens')
-                 if model_options.get('top_p'):
-                     google_config['top_p'] = model_options.get('top_p')
+                if model_options.get("temperature"):
+                    google_config["temperature"] = model_options.get("temperature")
+                if model_options.get("max_tokens"):
+                    google_config["max_output_tokens"] = model_options.get("max_tokens")
+                if model_options.get("top_p"):
+                    google_config["top_p"] = model_options.get("top_p")
 
             response = client.models.generate_content(
                 model=model.model,
                 contents=prompt,
-                config=types.GenerateContentConfig(**google_config)
+                config=types.GenerateContentConfig(**google_config),
             )
             return response.text
 
-        case 'openai':
+        case "openai":
             from openai import OpenAI
-            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-            openai_configs = ('top_p','temperature', 'max_tokens')
-            openai_options = {config : model_options.get(config) if model_options.get(config) else None for config in (set(tuple(model_options.keys())) & set(openai_configs))}
-            return client.chat.completions.create(
-                messages=[
-                    {
-                        "role" : "system",
-                        "content" : system_prompt
-                    },
-                    {
-                        "role" : "user",
-                        "content" : prompt
-                    }
-                ],
-                model=model.model,
-                stream=False,
-                **openai_options
-            ).choices[0].message.content
 
-        case 'custom_openai_compatible':
+            client = OpenAI(
+                api_key=model.api_key if model.api_key else os.getenv("OPENAI_API_KEY")
+            )
+            openai_configs = ("top_p", "temperature", "max_tokens")
+            openai_options = {
+                config: model_options.get(config) if model_options.get(config) else None
+                for config in (set(tuple(model_options.keys())) & set(openai_configs))
+            }
+            return (
+                client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    model=model.model,
+                    stream=False,
+                    **openai_options,
+                )
+                .choices[0]
+                .message.content
+            )
+
+        case "openai_compatible":
             from openai import OpenAI
-            client = OpenAI(api_key=os.getenv('CUSTOM_API_KEY', default='nokey'), base_url=str(model.host))
-            openai_configs = ('top_p','temperature', 'max_tokens')
-            openai_options = {config : model_options.get(config) if model_options.get(config) else None for config in (set(tuple(model_options.keys())) & set(openai_configs))}
-            return client.chat.completions.create(
-                messages=[
-                    {
-                        "role" : "system",
-                        "content" : system_prompt
-                    },
-                    {
-                        "role" : "user",
-                        "content" : prompt
-                    }
-                ],
-                model=model.model,
-                stream=False,
-                **openai_options
-            ).choices[0].message.content
+
+            client = OpenAI(
+                api_key=model.api_key
+                if model.api_key
+                else os.getenv("CUSTOM_API_KEY", default="nokey"),
+                base_url=str(model.host),
+            )
+            openai_configs = ("top_p", "temperature", "max_tokens")
+            openai_options = {
+                config: model_options.get(config) if model_options.get(config) else None
+                for config in (set(tuple(model_options.keys())) & set(openai_configs))
+            }
+            return (
+                client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    model=model.model,
+                    stream=False,
+                    **openai_options,
+                )
+                .choices[0]
+                .message.content
+            )
 
         case _:
             raise NotImplementedError("provider not found")

@@ -199,9 +199,20 @@ def main(
 ):
     """
     Generates a commit message based on the result of `git diff --staged -M` and your clues, via the LLM you choose.
+
+    API keys can be provided via environment variables or a `.env` file.
+    Supported environment variable names are:
+    - OPENAI_API_KEY
+    - GROQ_API_KEY
+    - GOOGLE_API_KEY
+    - CUSTOM_API_KEY (for 'custom_openai_compatible' provider)
+    - OLLAMA_HOST (for 'ollama' provider, e.g., 'http://localhost:11434'; this can also be set directly in the configuration file).
     """
     if ctx.invoked_subcommand is None:
+        # Load .env first
         load_dotenv(os.path.join(os.getcwd(), ".env"))
+        # Load CommitCraft.env if it exists (overrides .env)
+        load_dotenv(os.path.join(os.getcwd(), "CommitCraft.env"))
 
         # Get the git diff
         diff = get_diff()
@@ -222,7 +233,41 @@ def main(
         context_info = config.get('context') if config.get('context', False) else {'project_name' : project_name, 'project_language' : project_language, 'project_description' : project_description, 'commit_guidelines' : commit_guide}
 
         emoji_config = EmojiConfig(**config.get('emoji')) if config.get('emoji') else EmojiConfig(emoji_steps='single', emoji_convention='simple')
-        model_config = LModel(**config.get('models')) if config.get('models') else LModel()
+        
+        # Determine model config
+        providers_map = config.get('providers', {})
+        
+        # Check if 'provider' argument matches a named provider configuration
+        if provider and provider in providers_map:
+            # Load the named provider config
+            base_model_config = providers_map[provider]
+            
+            # Resolve API Key dynamically based on nickname
+            # Format: NICKNAME_API_KEY (e.g., REMOTE_API_KEY)
+            nickname = provider
+            env_key = f"{nickname.upper()}_API_KEY"
+            
+            resolved_api_key = os.getenv(env_key)
+            if resolved_api_key:
+                base_model_config['api_key'] = resolved_api_key
+            
+            # Initialize LModel using the named config
+            # We must be careful not to override 'provider' with the nickname in the next step
+            model_config = LModel(**base_model_config)
+            
+            # CLI override logic needs adjustment:
+            # If user provided --provider <nickname>, we effectively used it to pick the config.
+            # We should NOT use 'provider' variable to overwrite model_config.provider unless it was a standard provider.
+            # But 'provider' variable holds the nickname string now.
+            # So when updating LModel below, we should use model_config.provider instead of 'provider' variable
+            # IF we found a match in providers_map.
+            cli_provider_override = None # Do not override provider with nickname
+            
+        else:
+            # Fallback to default [models] block or use standard provider defaults
+            base_model_config = config.get('models') if config.get('models') else {}
+            model_config = LModel(**base_model_config)
+            cli_provider_override = provider # Apply CLI override (e.g. 'ollama', 'openai')
 
         # Construct the model options
         lmodel_options = LModelOptions(
@@ -237,10 +282,11 @@ def main(
         model_options = {config: cli_options.get(config) if cli_options.get(config, False) else config_options.get(config) for config in set(list(cli_options.keys()) + list(config_options.keys()))}
 
         model_config = LModel(
-            provider=provider if provider else model_config.provider,
-            model=model if model else None,
+            provider=cli_provider_override if cli_provider_override else model_config.provider,
+            model=model if model else model_config.model, # Allow overriding model even for named profile
             system_prompt=system_prompt if system_prompt else model_config.system_prompt,
             host=host if host else model_config.host,
+            api_key=model_config.api_key, # Preserve resolved key
             options=LModelOptions(**model_options)
         )
 
