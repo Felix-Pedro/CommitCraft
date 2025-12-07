@@ -29,9 +29,10 @@ def interactive_config():
 
     # Context
     typer.secho("\n[Project Context]", fg=typer.colors.BLUE)
-    config['context']['project_name'] = get_input_with_default("Project Name", "")
-    config['context']['project_language'] = get_input_with_default("Project Language", "")
-    config['context']['project_description'] = get_input_with_default("Project Description", "")
+    if not is_global:
+        config['context']['project_name'] = get_input_with_default("Project Name", "")
+        config['context']['project_language'] = get_input_with_default("Project Language", "")
+        config['context']['project_description'] = get_input_with_default("Project Description", "")
     config['context']['commit_guidelines'] = get_input_with_default("Commit Guidelines", "")
 
     # Models
