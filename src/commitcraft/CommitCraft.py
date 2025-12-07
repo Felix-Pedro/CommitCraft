@@ -2,7 +2,7 @@ import fnmatch
 import os
 import subprocess
 from enum import Enum
-from typing import List, Optional, Union, Literal
+from typing import List, Literal, Optional, Union
 
 from jinja2 import Template
 from pydantic import BaseModel, Extra, HttpUrl, conint, root_validator
@@ -13,9 +13,7 @@ from .defaults import default
 # Custom exceptions to be raised when using custom_openai_compatible provider.
 class MissingModelError(ValueError):
     def __init__(self):
-        self.message = (
-            "The model cannot be None for the 'openai_compatible' provider."
-        )
+        self.message = "The model cannot be None for the 'openai_compatible' provider."
         super().__init__(self.message)
 
 
@@ -113,7 +111,9 @@ class LModel(BaseModel):
     )
     system_prompt: Optional[str] = None
     options: Optional[LModelOptions] = None
-    host: Optional[Union[Literal["ollama_cloud"], HttpUrl]] = None  # required for openai_compatible
+    host: Optional[Union[Literal["ollama_cloud"], HttpUrl]] = (
+        None  # required for openai_compatible
+    )
     api_key: Optional[str] = None
 
     @root_validator(pre=True)
@@ -126,7 +126,7 @@ class LModel(BaseModel):
             if provider == Provider.groq:
                 values["model"] = "qwen/qwen3-32b"
             elif provider == Provider.google:
-                values["model"] = "gemini-2.5-pro"
+                values["model"] = "gemini-2.5-flash"
             elif provider == Provider.openai:
                 values["model"] = "gpt-3.5-turbo"
         return values

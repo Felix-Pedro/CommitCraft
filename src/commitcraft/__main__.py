@@ -1,12 +1,39 @@
 import os
+import re
+import sys
+
+# Force color support by default (fixes zsh detection issues)
+# Use --no-color flag or NO_COLOR=1 environment variable to disable
+if not os.environ.get('NO_COLOR'):
+    os.environ.setdefault('FORCE_COLOR', '1')
+
 from dotenv import load_dotenv
 from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions, EmojiConfig, LModel, filter_diff
 from .config_handler import interactive_config
 import typer
 from typing import Optional
 from typing_extensions import Annotated, Any
+from rich.console import Console
+from rich.theme import Theme
 
-app = typer.Typer()
+# Define a custom theme that uses standard ANSI colors to respect the user's terminal theme configuration
+custom_theme = Theme({
+    "info": "cyan",
+    "warning": "yellow",
+    "danger": "bold red",
+    "success": "bold green",
+    "thinking_title": "bold magenta",  # Magenta is often a good accent on both light/dark themes
+    "thinking_content": "italic dim"   # Uses default foreground color, dimmed
+})
+
+err_console = Console(stderr=True, theme=custom_theme, force_terminal=True)
+console = Console(theme=custom_theme, force_terminal=True)
+
+# Configure Rich for Typer's help output
+import rich.console
+rich.console._console = console
+
+app = typer.Typer(rich_markup_mode="rich")
 
 def load_file(filepath):
     """Loads configuration from a TOML, YAML, or JSON file."""
@@ -81,38 +108,45 @@ def load_config():
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
+    no_color: Annotated[
+        bool,
+        typer.Option(
+            "--no-color", "-p", "--plain",
+            help="Disable colored output (plain text only)"
+        )
+    ] = False,
     config_file: Annotated[
         Optional[str],
         typer.Option(
-            help="Path to the config file (TOML, YAML, or JSON)",
-            show_default='tries to open .commitcraft folder in the root of the repo'
+            help="Path to the config file ([cyan]TOML[/cyan], [cyan]YAML[/cyan], or [cyan]JSON[/cyan])",
+            show_default='tries to open [cyan].commitcraft[/cyan] folder in the root of the repo'
         )
     ] = None,
     ignore: Annotated[
         Optional[str],
         typer.Option(
-            help="files or file patterns to ignore on the message generation process comma separated",
-            show_default='tries to open .commitcraft/.ignore file of the repo'
+            help="Files or file patterns to [red]ignore[/red] (comma separated)",
+            show_default='tries to open [cyan].commitcraft/.ignore[/cyan] file of the repo'
         )
     ] = None,
     debug_prompt: Annotated[
         bool,
-        typer.Option(help="Return the prompt, don't send any request to the model")
+        typer.Option(help="Return the [yellow]prompt[/yellow], don't send any request to the model")
     ] = False,
 
     provider:  Annotated[
         str,
         typer.Option(
             rich_help_panel='Model Config',
-            help="Provider for the AI model (supported values are 'ollama', 'groq', 'google', 'openai' and 'custom_openai_compatible')"
+            help="Provider for the AI model (supported: [magenta]ollama[/magenta], [magenta]groq[/magenta], [magenta]google[/magenta], [magenta]openai[/magenta], [magenta]custom_openai_compatible[/magenta])"
         )
     ] = 'ollama',
     model: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Model Config',
-            help="Model name (e.g., 'gemma2', 'llama3.1:70b')",
-            show_default="ollama: 'qwen3', groq: 'qwen/qwen3-32b', google: 'gemini-2.5-pro', openai: 'gpt-3.5-turbo'"
+            help="Model name (e.g., [cyan]gemma2[/cyan], [cyan]llama3.1:70b[/cyan])",
+            show_default="ollama: [cyan]qwen3[/cyan], groq: [cyan]qwen/qwen3-32b[/cyan], google: [cyan]gemini-2.5-pro[/cyan], openai: [cyan]gpt-3.5-turbo[/cyan]"
         )
     ] = None,
     system_prompt: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', help="System prompt to guide the model")] = None,
@@ -126,61 +160,68 @@ def main(
             help="HTTP or HTTPS host for the provider, required for custom provider, not used for groq"
         )
     ] = None,
+    show_thinking: Annotated[
+        bool,
+        typer.Option(
+            rich_help_panel='Model Config',
+            help="Show the model's thinking process if available"
+        )
+    ] = False,
 
     bug: Annotated[
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Indicates to the model that the commit fix a bug, not necessary if using --bug-desc"
-        ) 
+            help="Indicates to the model that the commit [red]fixes a bug[/red], not necessary if using [cyan]--bug-desc[/cyan]"
+        )
     ] = False,
     bug_desc: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Describes the bug fixed"
+            help="[red]Describes the bug fixed[/red]"
         )
     ] = None,
     feat: Annotated[
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Indicates to the model that the commit adds a feature, not necessary if using --feat-desc"
-        ) 
+            help="Indicates to the model that the commit [green]adds a feature[/green], not necessary if using [cyan]--feat-desc[/cyan]"
+        )
     ] = False,
     feat_desc: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Describes the feature added"
+            help="[green]Describes the feature added[/green]"
         )
     ] = None,
     docs: Annotated[
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Indicates to the model that the commit focous on documentation, not necessary if using --docs-desc"
-        ) 
+            help="Indicates to the model that the commit focuses on [blue]documentation[/blue], not necessary if using [cyan]--docs-desc[/cyan]"
+        )
     ] = False,
     docs_desc: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Describes the documentation change/addition"
+            help="[blue]Describes the documentation change/addition[/blue]"
         )
     ] = None,
     refact: Annotated[
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Indicates to the model that the commit focous on refacotoring, not necessary if using --refact-desc"
-        ) 
+            help="Indicates to the model that the commit focuses on [yellow]refactoring[/yellow], not necessary if using [cyan]--refact-desc[/cyan]"
+        )
     ] = False,
     refact_desc: Annotated[
         Optional[str],
         typer.Option(
             rich_help_panel='Commit Clues',
-            help="Describes refactoring"
+            help="[yellow]Describes refactoring[/yellow]"
         )
     ] = None,
     context_clue: Annotated[
@@ -198,17 +239,23 @@ def main(
 
 ):
     """
-    Generates a commit message based on the result of `git diff --staged -M` and your clues, via the LLM you choose.
+    [bold green]Generates a commit message[/bold green] based on the result of [cyan]git diff --staged -M[/cyan] and your clues, via the LLM you choose.
 
-    API keys can be provided via environment variables or a `.env` file.
+    [bold yellow]API keys[/bold yellow] can be provided via environment variables or a [cyan].env[/cyan] file.
+
     Supported environment variable names are:
-    - OPENAI_API_KEY
-    - GROQ_API_KEY
-    - GOOGLE_API_KEY
-    - CUSTOM_API_KEY (for 'custom_openai_compatible' provider)
-    - OLLAMA_HOST (for 'ollama' provider, e.g., 'http://localhost:11434'; this can also be set directly in the configuration file).
+    • [cyan]OPENAI_API_KEY[/cyan]
+    • [cyan]GROQ_API_KEY[/cyan]
+    • [cyan]GOOGLE_API_KEY[/cyan]
+    • [cyan]CUSTOM_API_KEY[/cyan] (for [magenta]custom_openai_compatible[/magenta] provider)
+    • [cyan]OLLAMA_HOST[/cyan] (for [magenta]ollama[/magenta] provider, e.g., [dim]http://localhost:11434[/dim]; this can also be set directly in the configuration file).
     """
     if ctx.invoked_subcommand is None:
+        # Handle color output
+        if no_color:
+            os.environ['NO_COLOR'] = '1'
+            os.environ.pop('FORCE_COLOR', None)
+
         # Load .env first
         load_dotenv(os.path.join(os.getcwd(), ".env"))
         # Load CommitCraft.env if it exists (overrides .env)
@@ -302,27 +349,48 @@ def main(
         )
 
         # Call the commit_craft function and print the result
-        response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt)
+        with err_console.status("[success]Generating commit message...[/success]", spinner="dots"):
+            response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt)
+        
+        # Process <think> tags
+        think_pattern = r"<think>(.*?)</think>"
+        think_match = re.search(think_pattern, response, re.DOTALL)
+        
+        if think_match:
+            thinking_content = think_match.group(1).strip()
+            # Remove the thinking part from the response
+            response = re.sub(think_pattern, "", response, flags=re.DOTALL).strip()
+            
+            if show_thinking:
+                err_console.print(f"[thinking_title]Thinking Process:[/thinking_title]")
+                err_console.print(f"[thinking_content]{thinking_content}[/thinking_content]\n")
+
         typer.echo(response)
 
 @app.command('init')
 def init():
     """
-    This Command is not implemented yet.
+    [dim]This Command is not implemented yet.[/dim]
     """
     raise NotImplementedError("This command is not implemented yet")
 
 @app.command('config')
 def config():
     """
-    Interactively creates a configuration file.
+    [bold cyan]Interactively creates a configuration file.[/bold cyan]
+
+    Launch an interactive wizard to configure CommitCraft settings including:
+    • [green]Provider settings[/green] (Ollama, OpenAI, Google, Groq)
+    • [yellow]Model selection[/yellow]
+    • [magenta]Emoji conventions[/magenta]
+    • [blue]Project context[/blue]
     """
     interactive_config()
 
 @app.command('hook')
 def hook():
     """
-    This Command is not implemented yet.
+    [dim]This Command is not implemented yet.[/dim]
     """
     raise NotImplementedError("This command is not implemented yet")
 
