@@ -33,7 +33,7 @@ CommitCraft uses the following guidelines by default when generating commit mess
 ## Default System Prompt Template
 
 ```jinja2
-# Proposure
+# Purpose
 
 You are a commit message helper {% if project_name or project_language %} for {{ project_name }} {% if project_language %} a project written in {{ project_language }} {% endif %} {% endif %} {% if project_description %} described as:
 

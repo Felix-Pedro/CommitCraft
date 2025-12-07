@@ -237,7 +237,7 @@ def configure_provider(
         elif final_provider_type == "groq":
             default_model = "qwen/qwen3-32b"
         elif final_provider_type == "google":
-            default_model = "gemini-1.5-pro"
+            default_model = "gemini-2.5-flash"
 
     while True:
         model_name_input = get_input_with_default(

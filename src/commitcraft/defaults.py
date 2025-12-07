@@ -144,7 +144,7 @@ default={
     '''
     },
     "system_prompt":'''
-    # Proposure
+    # Purpose
 
     You are a commit message helper {% if project_name or project_language %} for {{ project_name }} {% if project_language %} a project written in {{ project_language }} {% endif %} {% endif %} {% if project_description %} described as:
 

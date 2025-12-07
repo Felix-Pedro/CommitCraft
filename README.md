@@ -23,7 +23,7 @@ You can install CommitCraft using `pipx` for a hassle-free experience:
 ```bash
 pipx install commitcraft
 ```
-Note : the default instalations is ollama only.
+Note : the default installation is ollama only.
 
 If you intent to use some provider other than ollama consider using one of the following:
 
