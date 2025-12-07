@@ -121,9 +121,11 @@ class LModel(BaseModel):
         # If 'model' is not provided, set it based on 'provider'
         provider = values.get("provider")
         if "model" not in values or values["model"] is None:
-            if provider == Provider.ollama or provider == Provider.ollama_cloud:
+            if provider == Provider.ollama:
                 values["model"] = "qwen3"
-            if provider == Provider.groq:
+            elif provider == Provider.ollama_cloud:
+                values["model"] = "qwen3-coder:480b-cloud"
+            elif provider == Provider.groq:
                 values["model"] = "qwen/qwen3-32b"
             elif provider == Provider.google:
                 values["model"] = "gemini-2.5-flash"
@@ -216,26 +218,20 @@ def commit_craft(
     if debug_prompt:
         return f"system_prompt:\n{system_prompt}\n\n prompt:\n{prompt}"
     match model.provider:
-        case "ollama" | "ollama_cloud":
+        case "ollama":
             import ollama
 
-            # Ollama Client initialization with optional host and header for API key (if needed by some cloud providers or auth proxies)
-            # The standard python client might support headers or auth via host string or env vars.
-            # Assuming standard client usage:
+            # Ollama local instance initialization
             client_args = {}
             host_val = str(model.host) if model.host else os.getenv("OLLAMA_HOST")
             if host_val:
                 client_args["host"] = host_val
 
-            # If there's an API key for Ollama (e.g. cloud), passing it might depend on the specific cloud or proxy.
-            # Official library might not expose 'api_key' param directly in constructor unless recent update.
-            # But checking docs or common patterns: often headers={'Authorization': 'Bearer ...'}
-            # For now, let's assume we can pass it if it exists in env.
+            # API key support for authenticated Ollama instances
             ollama_api_key = (
                 model.api_key if model.api_key else os.getenv("OLLAMA_API_KEY")
             )
             if ollama_api_key:
-                # Some versions/proxies use headers
                 client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
 
             Ollama = ollama.Client(**client_args)
@@ -264,6 +260,39 @@ def commit_craft(
                     prompt=prompt,
                     options=model_options,
                 )["response"]
+
+        case "ollama_cloud":
+            import ollama
+
+            # Ollama Cloud configuration per https://docs.ollama.com/cloud#python
+            client_args = {
+                "host": "https://ollama.com"
+            }
+
+            # Cloud requires API key authentication
+            ollama_api_key = (
+                model.api_key if model.api_key else os.getenv("OLLAMA_API_KEY")
+            )
+            if ollama_api_key:
+                client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
+
+            Ollama = ollama.Client(**client_args)
+
+            # Ollama Cloud uses chat API, not generate API
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+
+            # Filter options for chat API (cloud doesn't use num_ctx)
+            chat_options = {k: v for k, v in model_options.items() if k != "num_ctx"}
+
+            response = Ollama.chat(
+                model=model.model,
+                messages=messages,
+                options=chat_options if chat_options else None,
+            )
+            return response["message"]["content"]
 
         case "groq":
             from groq import Groq
