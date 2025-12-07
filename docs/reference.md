@@ -177,8 +177,8 @@ input_data = CommitCraftInput(
 
 clues = clue_parser(input_data)
 # Result: {
-#   'bug': 'This commit focous on fixing a bug',
-#   'feat': 'This commit focous on a new feature: Added dark mode'
+#   'bug': 'This commit focus on fixing a bug',
+#   'feat': 'This commit focus on a new feature: Added dark mode'
 # }
 ```
 

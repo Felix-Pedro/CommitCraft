@@ -25,7 +25,7 @@ pipx install commitcraft
 ```
 Note : the default instalations is ollama only.
 
-If you intent to use some provider other than ollama consider using one of the folowing:
+If you intent to use some provider other than ollama consider using one of the following:
 
 ```bash
 pipx install 'commitcraft[openai]'
@@ -42,7 +42,6 @@ pipx install 'commitcraft[google]'
 ```bash
 pipx install 'commitcraft[all-providers]'
 ```
-
 
 ## Quick Start
 
@@ -367,15 +366,15 @@ However, if you are not self-hosting your models, it's important to be aware of 
 
 ## Troubleshooting
 
-If for some reason a dependency is missing folow these steps:
+If for some reason a dependency is missing follow these steps:
 
-1. Run the folowing command 
+1. Run the following command 
 
 ```sh
-pipx inject commitcraft [depency_name]
+pipx inject commitcraft [dependency_name]
 ```
 
-2. Report the problem to the issues page, also provid the command you used to install.
+2. Report the problem to the issues page, also provide the command you used to install.
 
 
 ## License

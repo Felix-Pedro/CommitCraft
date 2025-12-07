@@ -14,10 +14,10 @@ CommitClues are optional flags you can provide to give the AI additional context
 
 | Clue Type | CLI Flag | Description | Default Message Added to Prompt |
 | :--- | :--- | :--- | :--- |
-| Bug Fix | `--bug` or `--bug-desc "..."` | Indicates this commit fixes a bug | "This commit focous on fixing a bug" |
-| Feature | `--feat` or `--feat-desc "..."` | Indicates this commit adds a new feature | "This commit focous on a new feature" |
-| Documentation | `--docs` or `--docs-desc "..."` | Indicates documentation changes | "This commit focous on docs" |
-| Refactoring | `--refact` or `--refact-desc "..."` | Indicates code refactoring | "This commit focous on refactoring" |
+| Bug Fix | `--bug` or `--bug-desc "..."` | Indicates this commit fixes a bug | "This commit focus on fixing a bug" |
+| Feature | `--feat` or `--feat-desc "..."` | Indicates this commit adds a new feature | "This commit focus on a new feature" |
+| Documentation | `--docs` or `--docs-desc "..."` | Indicates documentation changes | "This commit focus on docs" |
+| Refactoring | `--refact` or `--refact-desc "..."` | Indicates code refactoring | "This commit focus on refactoring" |
 | Custom | `--context-clue "..."` | Provide any custom context hint | Your custom text |
 
 ### Basic Usage (Boolean Flags)
