@@ -22,6 +22,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - **Plain Output Mode**: Added `--no-color` / `-p` / `--plain` flags to disable colored output for piping/scripting.
 - Forced color support by default to fix color detection issues in zsh and other shells.
 - **Fun Loading Messages**: Added randomized funny programming and AI jokes to the commit generation loading spinner. Messages rotate every 3 seconds during longer operations.
+- **Git Hook Integration**: Implemented `CommitCraft hook` command to set up automatic commit message generation via git hooks. Supports both local repository hooks and global git templates.
 
 ### Changed
 

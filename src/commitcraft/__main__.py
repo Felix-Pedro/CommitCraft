@@ -2,6 +2,8 @@ import os
 import re
 import sys
 import random
+import threading
+import time
 
 # Force color support by default (fixes zsh detection issues)
 # Use --no-color flag or NO_COLOR=1 environment variable to disable
@@ -16,6 +18,8 @@ from typing import Optional
 from typing_extensions import Annotated, Any
 from rich.console import Console
 from rich.theme import Theme
+from rich.live import Live
+from rich.spinner import Spinner
 
 # Define a custom theme that uses standard ANSI colors to respect the user's terminal theme configuration
 custom_theme = Theme({
@@ -59,6 +63,55 @@ LOADING_MESSAGES = [
     "[success]Hoping this commit makes sense...[/success]",
     "[success]Crafting the perfect commit (no pressure)...[/success]",
 ]
+
+def rotating_status(callable_func, *args, **kwargs):
+    """
+    Execute a function with a rotating loading message that changes every 3 seconds.
+    """
+    result = [None]
+    exception = [None]
+    finished = threading.Event()
+
+    def run_function():
+        try:
+            result[0] = callable_func(*args, **kwargs)
+        except Exception as e:
+            exception[0] = e
+        finally:
+            finished.set()
+
+    # Start the function in a background thread
+    thread = threading.Thread(target=run_function, daemon=True)
+    thread.start()
+
+    # Shuffle messages to get a random order
+    messages = LOADING_MESSAGES.copy()
+    random.shuffle(messages)
+    message_index = 0
+
+    # Create a live display with rotating messages
+    with Live(
+        Spinner("dots", text=messages[message_index], style="success"),
+        console=err_console,
+        refresh_per_second=10
+    ) as live:
+        while not finished.is_set():
+            # Wait for 3 seconds or until finished
+            if finished.wait(timeout=3.0):
+                break
+
+            # Rotate to next message
+            message_index = (message_index + 1) % len(messages)
+            live.update(Spinner("dots", text=messages[message_index], style="success"))
+
+    # Wait for thread to complete
+    thread.join()
+
+    # Re-raise any exception that occurred
+    if exception[0]:
+        raise exception[0]
+
+    return result[0]
 
 def load_file(filepath):
     """Loads configuration from a TOML, YAML, or JSON file."""
@@ -373,10 +426,11 @@ def main(
 
         )
 
-        # Call the commit_craft function and print the result
-        loading_message = random.choice(LOADING_MESSAGES)
-        with err_console.status(loading_message, spinner="dots"):
-            response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt)
+        # Call the commit_craft function with rotating loading messages
+        response = rotating_status(
+            commit_craft,
+            input, model_config, context_info, emoji_config, debug_prompt
+        )
         
         # Process <think> tags
         think_pattern = r"<think>(.*?)</think>"
@@ -414,11 +468,178 @@ def config():
     interactive_config()
 
 @app.command('hook')
-def hook():
+def hook(
+    uninstall: Annotated[
+        bool,
+        typer.Option("--uninstall", "-u", help="Remove the CommitCraft git hook")
+    ] = False,
+    global_hook: Annotated[
+        bool,
+        typer.Option("--global", "-g", help="Install as global git hook template")
+    ] = False,
+):
     """
-    [dim]This Command is not implemented yet.[/dim]
+    [bold cyan]Set up CommitCraft as a git commit hook.[/bold cyan]
+
+    Installs a [yellow]prepare-commit-msg[/yellow] hook that automatically generates commit messages.
+    The generated message will be pre-filled in your editor for you to review and edit.
+
+    • [green]Local install[/green]: Installs hook in current repository's .git/hooks/
+    • [blue]Global install[/blue]: Sets up git template for all new repositories
+    • [red]Uninstall[/red]: Removes the CommitCraft hook
     """
-    raise NotImplementedError("This command is not implemented yet")
+    import subprocess
+    from pathlib import Path
+
+    if uninstall:
+        _uninstall_hook(global_hook)
+    else:
+        _install_hook(global_hook)
+
+def _install_hook(global_hook: bool):
+    """Install the CommitCraft git hook."""
+    from pathlib import Path
+    import subprocess
+
+    if global_hook:
+        # Get git template directory
+        try:
+            result = subprocess.run(
+                ["git", "config", "--global", "init.templatedir"],
+                capture_output=True, text=True
+            )
+            template_dir = result.stdout.strip()
+
+            if not template_dir:
+                # Set default template directory
+                template_dir = str(Path.home() / ".git-templates")
+                subprocess.run(
+                    ["git", "config", "--global", "init.templatedir", template_dir],
+                    check=True
+                )
+                console.print(f"[cyan]Set git template directory to:[/cyan] {template_dir}")
+
+            hook_dir = Path(template_dir) / "hooks"
+        except subprocess.CalledProcessError as e:
+            console.print(f"[danger]Error setting up global hook:[/danger] {e}", style="red")
+            raise typer.Exit(1)
+    else:
+        # Check if we're in a git repository
+        try:
+            subprocess.run(["git", "rev-parse", "--git-dir"],
+                         capture_output=True, check=True)
+        except subprocess.CalledProcessError:
+            console.print("[danger]Error:[/danger] Not a git repository", style="red")
+            console.print("Run [cyan]git init[/cyan] first or use [cyan]--global[/cyan] for global hook")
+            raise typer.Exit(1)
+
+        hook_dir = Path(".git/hooks")
+
+    # Create hooks directory if it doesn't exist
+    hook_dir.mkdir(parents=True, exist_ok=True)
+
+    hook_path = hook_dir / "prepare-commit-msg"
+
+    # Check if hook already exists and is not ours
+    if hook_path.exists():
+        with open(hook_path, 'r') as f:
+            content = f.read()
+            if "CommitCraft" not in content:
+                if not typer.confirm(
+                    f"A prepare-commit-msg hook already exists. Overwrite?",
+                    default=False
+                ):
+                    console.print("[yellow]Installation cancelled.[/yellow]")
+                    raise typer.Exit(0)
+
+    # Create the hook script
+    hook_script = '''#!/bin/sh
+# CommitCraft Git Hook
+# Automatically generates commit messages using AI
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Only generate message for regular commits (not merge, squash, etc.)
+if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
+    # Check if there are staged changes
+    if git diff --cached --quiet; then
+        exit 0
+    fi
+
+    # Generate commit message with CommitCraft
+    # Redirect stderr to /dev/null to hide the loading spinner in the hook
+    GENERATED_MSG=$(CommitCraft 2>/dev/null)
+
+    if [ $? -eq 0 ] && [ -n "$GENERATED_MSG" ]; then
+        # Prepend generated message to commit message file
+        echo "$GENERATED_MSG" > "$COMMIT_MSG_FILE.tmp"
+        echo "" >> "$COMMIT_MSG_FILE.tmp"
+        echo "# AI-generated commit message above. Edit as needed." >> "$COMMIT_MSG_FILE.tmp"
+        cat "$COMMIT_MSG_FILE" >> "$COMMIT_MSG_FILE.tmp"
+        mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
+    fi
+fi
+'''
+
+    # Write the hook script
+    with open(hook_path, 'w') as f:
+        f.write(hook_script)
+
+    # Make it executable
+    hook_path.chmod(0o755)
+
+    if global_hook:
+        console.print("[success]✓[/success] Global git hook installed successfully!", style="bold green")
+        console.print(f"[cyan]Location:[/cyan] {hook_path}")
+        console.print("\n[yellow]Note:[/yellow] This will apply to newly initialized repositories.")
+        console.print("For existing repos, run [cyan]CommitCraft hook[/cyan] in each repository.")
+    else:
+        console.print("[success]✓[/success] Git hook installed successfully!", style="bold green")
+        console.print(f"[cyan]Location:[/cyan] {hook_path}")
+        console.print("\n[green]Next time you commit, CommitCraft will generate a message for you![/green]")
+
+def _uninstall_hook(global_hook: bool):
+    """Uninstall the CommitCraft git hook."""
+    from pathlib import Path
+    import subprocess
+
+    if global_hook:
+        try:
+            result = subprocess.run(
+                ["git", "config", "--global", "init.templatedir"],
+                capture_output=True, text=True
+            )
+            template_dir = result.stdout.strip()
+
+            if not template_dir:
+                console.print("[yellow]No global git template directory configured.[/yellow]")
+                raise typer.Exit(0)
+
+            hook_path = Path(template_dir) / "hooks" / "prepare-commit-msg"
+        except subprocess.CalledProcessError:
+            console.print("[danger]Error reading git configuration.[/danger]", style="red")
+            raise typer.Exit(1)
+    else:
+        hook_path = Path(".git/hooks/prepare-commit-msg")
+
+    if not hook_path.exists():
+        console.print("[yellow]No CommitCraft hook found.[/yellow]")
+        raise typer.Exit(0)
+
+    # Check if it's a CommitCraft hook
+    with open(hook_path, 'r') as f:
+        content = f.read()
+        if "CommitCraft" not in content:
+            console.print("[yellow]The existing hook is not a CommitCraft hook.[/yellow]")
+            if not typer.confirm("Remove it anyway?", default=False):
+                raise typer.Exit(0)
+
+    # Remove the hook
+    hook_path.unlink()
+
+    scope = "global" if global_hook else "local"
+    console.print(f"[success]✓[/success] CommitCraft {scope} hook removed successfully!", style="bold green")
 
 if __name__ == "__main__":
     app()
