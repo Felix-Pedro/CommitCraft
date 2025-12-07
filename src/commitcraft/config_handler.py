@@ -377,9 +377,21 @@ def interactive_config():
     main_env_var = None
 
     should_configure_main = True
-    if is_edit_mode and config["models"]:
-        if not typer.confirm("Edit default provider settings?", default=False):
+
+    # For project configs, offer to skip and use global settings
+    if not is_global:
+        if typer.confirm("Configure project-specific model settings? (No = use global settings)", default=True):
+            should_configure_main = True
+        else:
             should_configure_main = False
+            config["models"] = {}  # Clear models section to use global
+            print("[cyan]Project will use global model settings.[/cyan]")
+
+    # For global configs or if user wants project-specific settings
+    if should_configure_main:
+        if is_edit_mode and config["models"]:
+            if not typer.confirm("Edit default provider settings?", default=False):
+                should_configure_main = False
 
     if should_configure_main:
         main_config, main_key_info, main_env_var = configure_provider(

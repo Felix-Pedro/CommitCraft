@@ -198,19 +198,30 @@ def load_config():
 def main(
     ctx: typer.Context,
     version: Annotated[
-        Optional[bool],
+        bool,
         typer.Option(
             "--version", "-v",
             callback=version_callback,
             is_eager=True,
+            is_flag=True,
             help="Show version and exit"
         )
-    ] = None,
+    ] = False,
     no_color: Annotated[
         bool,
         typer.Option(
-            "--no-color", "-p", "--plain",
-            help="Disable colored output (plain text only)"
+            "--no-color",
+            is_flag=True,
+            help="Disable colored output (plain text only). Also available as --plain"
+        )
+    ] = False,
+    plain: Annotated[
+        bool,
+        typer.Option(
+            "--plain",
+            hidden=True,
+            is_flag=True,
+            help="Alias for --no-color"
         )
     ] = False,
     config_file: Annotated[
@@ -229,7 +240,7 @@ def main(
     ] = None,
     debug_prompt: Annotated[
         bool,
-        typer.Option(help="Return the [yellow]prompt[/yellow], don't send any request to the model")
+        typer.Option(is_flag=True, help="Return the [yellow]prompt[/yellow], don't send any request to the model")
     ] = False,
 
     provider:  Annotated[
@@ -237,7 +248,8 @@ def main(
         typer.Option(
             rich_help_panel='Model Config',
             envvar="COMMITCRAFT_PROVIDER",
-            help="Provider for the AI model (supported: [magenta]ollama[/magenta], [magenta]groq[/magenta], [magenta]google[/magenta], [magenta]openai[/magenta], [magenta]custom_openai_compatible[/magenta])"
+            help="Provider for the AI model (supported: [magenta]ollama[/magenta], [magenta]ollama_cloud[/magenta], [magenta]groq[/magenta], [magenta]google[/magenta], [magenta]openai[/magenta], [magenta]openai_compatible[/magenta])",
+            show_default="ollama"
         )
     ] = None,
     model: Annotated[
@@ -246,7 +258,7 @@ def main(
             rich_help_panel='Model Config',
             envvar="COMMITCRAFT_MODEL",
             help="Model name (e.g., [cyan]gemma2[/cyan], [cyan]llama3.1:70b[/cyan])",
-            show_default="ollama: [cyan]qwen3[/cyan], groq: [cyan]qwen/qwen3-32b[/cyan], google: [cyan]gemini-2.5-pro[/cyan], openai: [cyan]gpt-3.5-turbo[/cyan]"
+            show_default="ollama: [cyan]qwen3[/cyan], ollama_cloud: [cyan]qwen3-coder:480b-cloud[/cyan], groq: [cyan]qwen/qwen3-32b[/cyan], google: [cyan]gemini-2.5-pro[/cyan], openai: [cyan]gpt-3.5-turbo[/cyan]"
         )
     ] = None,
     system_prompt: Annotated[Optional[str], typer.Option(rich_help_panel='Model Config', envvar="COMMITCRAFT_SYSTEM_PROMPT", help="System prompt to guide the model")] = None,
@@ -266,6 +278,7 @@ def main(
         typer.Option(
             rich_help_panel='Model Config',
             envvar="COMMITCRAFT_SHOW_THINKING",
+            is_flag=True,
             help="Show the model's thinking process if available"
         )
     ] = False,
@@ -274,6 +287,7 @@ def main(
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
+            is_flag=True,
             help="Indicates to the model that the commit [red]fixes a bug[/red], not necessary if using [cyan]--bug-desc[/cyan]"
         )
     ] = False,
@@ -288,6 +302,7 @@ def main(
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
+            is_flag=True,
             help="Indicates to the model that the commit [green]adds a feature[/green], not necessary if using [cyan]--feat-desc[/cyan]"
         )
     ] = False,
@@ -302,6 +317,7 @@ def main(
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
+            is_flag=True,
             help="Indicates to the model that the commit focuses on [blue]documentation[/blue], not necessary if using [cyan]--docs-desc[/cyan]"
         )
     ] = False,
@@ -316,6 +332,7 @@ def main(
         bool,
         typer.Option(
             rich_help_panel='Commit Clues',
+            is_flag=True,
             help="Indicates to the model that the commit focuses on [yellow]refactoring[/yellow], not necessary if using [cyan]--refact-desc[/cyan]"
         )
     ] = False,
@@ -349,12 +366,12 @@ def main(
     • [cyan]OPENAI_API_KEY[/cyan]
     • [cyan]GROQ_API_KEY[/cyan]
     • [cyan]GOOGLE_API_KEY[/cyan]
-    • [cyan]CUSTOM_API_KEY[/cyan] (for [magenta]custom_openai_compatible[/magenta] provider)
+    • [cyan]CUSTOM_API_KEY[/cyan] (for [magenta]openai_compatible[/magenta] provider)
     • [cyan]OLLAMA_HOST[/cyan] (for [magenta]ollama[/magenta] provider, e.g., [dim]http://localhost:11434[/dim]; this can also be set directly in the configuration file).
     """
     if ctx.invoked_subcommand is None:
         # Handle color output
-        if no_color:
+        if no_color or plain:
             os.environ['NO_COLOR'] = '1'
             os.environ.pop('FORCE_COLOR', None)
 
@@ -495,15 +512,15 @@ def config():
 def hook(
     uninstall: Annotated[
         bool,
-        typer.Option("--uninstall", "-u", help="Remove the CommitCraft git hook")
+        typer.Option("--uninstall", "-u", is_flag=True, help="Remove the CommitCraft git hook")
     ] = False,
     global_hook: Annotated[
         bool,
-        typer.Option("--global", "-g", help="Install as global git hook template")
+        typer.Option("--global", "-g", is_flag=True, help="Install as global git hook template")
     ] = False,
     no_interactive: Annotated[
         bool,
-        typer.Option("--no-interactive", help="Disable interactive prompts for CommitClues in the hook")
+        typer.Option("--no-interactive", is_flag=True, help="Disable interactive prompts for CommitClues in the hook")
     ] = False,
 ):
     """
