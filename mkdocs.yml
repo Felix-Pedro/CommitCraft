@@ -1,0 +1,56 @@
+site_name: CommitCraft
+site_url: https://github.com/Felix-Pedro/CommitCraft
+repo_url: https://github.com/Felix-Pedro/CommitCraft
+repo_name: Felix-Pedro/CommitCraft
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings
+  - include-markdown
+  # - mkdocs-click
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - CLI Reference: cli.md
+    - Configuration: config.md
+    - Recipes & Tips: recipes.md
+    - Troubleshooting: troubleshooting.md
+  - API Reference: reference.md
+  - Contributing: contributing.md
+  - Code of Conduct: CONDUCT.md
+  - Changelog: changelog.md
+  - License: license.md

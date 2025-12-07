@@ -294,22 +294,26 @@ The interactive config wizard (`CommitCraft config`) will help you set up these 
 
 #### Ollama Cloud
 
-CommitCraft supports **Ollama Cloud** (cloud-hosted Ollama instances) with the `ollama_cloud` provider:
+CommitCraft supports **Ollama Cloud** with the `ollama_cloud` provider. This connects to Ollama's cloud service at `https://ollama.com` using the chat API:
 
 ```bash
 # Using CLI
-CommitCraft --provider ollama_cloud --model qwen3
+CommitCraft --provider ollama_cloud --model qwen3-coder:480b-cloud
 
 # Or in config file
 [models]
 provider = "ollama_cloud"
-model = "qwen3"
+model = "qwen3-coder:480b-cloud"
 ```
 
-Set your Ollama Cloud API key in the environment:
+**Requirements:**
+- Get your API key from [ollama.com/settings/keys](https://ollama.com/settings/keys)
+- Set the environment variable:
 ```sh
 OLLAMA_API_KEY=your-ollama-cloud-key
 ```
+
+**Note:** Unlike local Ollama, the cloud provider uses the chat API and automatically connects to `https://ollama.com`. The `--host` parameter is not needed for Ollama Cloud.
 
 #### OpenAI-Compatible Providers
 
@@ -328,11 +332,16 @@ CommitCraft itself does not log, record or send any information about your usage
 However, it is important to note that by using CommitCraft, you are agreeing to the terms of the providers you choose, as CommitCraft sends diffs and contextual information to their API. Unless you self-host the application, these providers may still collect your request history and metadata information. For more detailed information about how each provider handles your data, please review their respective privacy policies:
 
 - [Ollama Cloud](https://ollama.com/cloud) 
-    > **What data is logged in Ollama's cloud?**
+
+    >Ollama Cloud FAQ:
+    > 
+    >**What data is logged in Ollama's cloud?**
     >
     > Ollama does not log prompt or response data.  
+    >
+    > (Accessed: December 7, 2025)
 
-(Accessed: December 7, 2025)
+
 - [Groq](https://groq.com/privacy-policy/)
 - [Google](https://ai.google.dev/gemini-api/terms)
 - [OpenAI](https://openai.com/policies/privacy-policy/)
@@ -371,7 +380,7 @@ pipx inject commitcraft [depency_name]
 
 ## License
 
-This project is licensed under the AGPL 3.0 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPL 3.0 License - see the [LICENSE](https://github.com/Felix-Pedro/CommitCraft/blob/main/LICENSE) file for details.
 
 ---
 
