@@ -568,8 +568,8 @@ if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
     fi
 
     # Generate commit message with CommitCraft
-    # Redirect stderr to /dev/null to hide the loading spinner in the hook
-    GENERATED_MSG=$(CommitCraft 2>/dev/null)
+    # stderr goes to terminal (shows loading spinner), stdout captured
+    GENERATED_MSG=$(CommitCraft)
 
     if [ $? -eq 0 ] && [ -n "$GENERATED_MSG" ]; then
         # Prepend generated message to commit message file
