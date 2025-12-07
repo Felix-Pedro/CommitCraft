@@ -60,8 +60,13 @@ def fetch_models(provider, api_key=None, host=None):
 
             client = OpenAI(api_key=api_key, base_url=host)
             return [m.id for m in client.models.list()]
-    except Exception:
-        # typer.secho(f"Debug: {e}", fg=typer.colors.RED)
+    except ImportError as e:
+        # Provider library not installed
+        print(f"[yellow]Provider library not installed: {e}[/yellow]")
+        return []
+    except Exception as e:
+        # Connection error, authentication error, or other API issues
+        print(f"[yellow]Could not fetch models: {str(e)}[/yellow]")
         return []
     return []
 

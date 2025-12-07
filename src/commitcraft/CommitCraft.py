@@ -229,30 +229,16 @@ def commit_craft(
 
             Ollama = ollama.Client(**client_args)
 
-            if "num_ctx" in model_options.keys():
-                if model_options["num_ctx"]:
-                    return Ollama.generate(
-                        model=model.model,
-                        system=system_prompt,
-                        prompt=prompt,
-                        options=model_options,
-                    )["response"]
-                else:
-                    model_options["num_ctx"] = get_context_size(prompt, system_prompt)
-                    return Ollama.generate(
-                        model=model.model,
-                        system=system_prompt,
-                        prompt=prompt,
-                        options=model_options,
-                    )["response"]
-            else:
+            # Set context size if not explicitly configured
+            if "num_ctx" not in model_options or not model_options["num_ctx"]:
                 model_options["num_ctx"] = get_context_size(prompt, system_prompt)
-                return Ollama.generate(
-                    model=model.model,
-                    system=system_prompt,
-                    prompt=prompt,
-                    options=model_options,
-                )["response"]
+
+            return Ollama.generate(
+                model=model.model,
+                system=system_prompt,
+                prompt=prompt,
+                options=model_options,
+            )["response"]
 
         case "ollama_cloud":
             import ollama
