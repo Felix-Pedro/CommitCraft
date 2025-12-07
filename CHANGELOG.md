@@ -23,6 +23,9 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - Forced color support by default to fix color detection issues in zsh and other shells.
 - **Fun Loading Messages**: Added randomized funny programming and AI jokes to the commit generation loading spinner. Messages rotate every 3 seconds during longer operations.
 - **Git Hook Integration**: Implemented `CommitCraft hook` command to set up automatic commit message generation via git hooks. Supports both local repository hooks and global git templates.
+- **Interactive Git Hook Mode**: Git hooks now prompt for commit type (bug/feature/docs/refactor) and optional descriptions, allowing CommitClues to be used directly in the hook workflow. Interactive mode is enabled by default; use `--no-interactive` flag to disable prompts.
+- **Hook Version Checking**: Git hooks now automatically check if they're outdated and display upgrade instructions when CommitCraft is updated.
+- **Version Flag**: Added `--version` / `-v` flag to display the installed CommitCraft version.
 
 ### Changed
 
