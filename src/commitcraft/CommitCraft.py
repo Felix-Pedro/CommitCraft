@@ -10,7 +10,7 @@ from pydantic import BaseModel, Extra, HttpUrl, conint, root_validator
 from .defaults import default
 
 
-# Custom exceptions to be raised when using custom_openai_compatible provider.
+# Custom exceptions to be raised when using openai_compatible provider.
 class MissingModelError(ValueError):
     def __init__(self):
         self.message = "The model cannot be None for the 'openai_compatible' provider."

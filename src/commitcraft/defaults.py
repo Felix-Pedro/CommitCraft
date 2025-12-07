@@ -1,26 +1,26 @@
 default={
     'commit_guidelines' : '''
-    - Never ask for folow-up questions.
-    - Don't ask quetions.
+    - Never ask for follow-up questions.
+    - Don't ask questions.
     - Don't talk about yourself.
     - Be concise and clear.
     - Be informative.
     - Don't explain row by row just the global goal of the changes.
-    - Avoid unecessary details and long explanations.
+    - Avoid unnecessary details and long explanations.
     - Use action verbs.
     - Use bullet points in the body if there are many changes
     - Do not talk about the hashes.
     - Create concise and comprehensive commit messages.
-    - Be direct about what changed and why. Focous on what.
-    - Give a small summary of what has changed and how it may afect the rest of the project.
-    - Do not return any explanation other then the commit message itself.
-    - If there are many changes focous on the main ones.
-    - The first row shall be te title of your message, so make it simple and informative.
+    - Be direct about what changed and why. Focus on what.
+    - Give a small summary of what has changed and how it may affect the rest of the project.
+    - Do not return any explanation other than the commit message itself.
+    - If there are many changes focus on the main ones.
+    - The first row shall be the title of your message, so make it simple and informative.
     - Do not introduce your message!
     ''',
     'emoji_guidelines' :{
         'full':'''
-    For the title of your message use the GitMoji Convetion, here is some help emoji ; description:
+    For the title of your message use the GitMoji Convention, here is some help emoji ; description:
         🎨 ; Improve structure / format of the code.
         ⚡️ ; Improve performance.
         🔥 ; Remove code or files.
@@ -97,7 +97,7 @@ default={
     The title shall be formated as "{emoji} {title}"
     ''',
         'simple':'''
-    For the title of your message use the GitMoji Convetion, here is some help emoji ; description:":
+    For the title of your message use the GitMoji Convention, here is some help emoji ; description:
         ⚡️ ; Improve performance.
         🐛 ; Fix a bug.
         🚑️ ; Critical hotfix.
@@ -139,7 +139,7 @@ default={
     The title shall be formated as "{emoji} {title}"
     ''',
     'emoji_agent':'''
-    Your mission is to recive a commit message and return an emoji based on the folowing guide.
+    Your mission is to receive a commit message and return an emoji based on the following guide.
     Do not explain yourself, return only the single emoji.
     '''
     },
@@ -169,9 +169,9 @@ default={
         {{ custom_clue }}
     {% endif %}
     ''',
-    'bug' : 'This commit focous on fixing a bug',
-    'feat' : 'This commit focous on a new feature',
-    'docs' : 'This commit focous on docs',
-    'refact' : 'This commit focous on refactoring'
+    'bug' : 'This commit focus on fixing a bug',
+    'feat' : 'This commit focus on a new feature',
+    'docs' : 'This commit focus on docs',
+    'refact' : 'This commit focus on refactoring'
 
 }
