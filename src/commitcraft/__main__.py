@@ -38,6 +38,17 @@ console = Console(theme=custom_theme, force_terminal=True)
 import rich.console
 rich.console._console = console
 
+def version_callback(value: bool):
+    """Display version and exit."""
+    if value:
+        try:
+            import importlib.metadata
+            version = importlib.metadata.version("commitcraft")
+        except:
+            version = "unknown"
+        console.print(f"[bold cyan]CommitCraft[/bold cyan] version [green]{version}[/green]")
+        raise typer.Exit()
+
 app = typer.Typer(rich_markup_mode="rich")
 
 # Funny loading messages for commit generation
@@ -186,6 +197,15 @@ def load_config():
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
+    version: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--version", "-v",
+            callback=version_callback,
+            is_eager=True,
+            help="Show version and exit"
+        )
+    ] = None,
     no_color: Annotated[
         bool,
         typer.Option(
@@ -561,14 +581,32 @@ def _install_hook(global_hook: bool, interactive: bool = True):
                     console.print("[yellow]Installation cancelled.[/yellow]")
                     raise typer.Exit(0)
 
+    # Get the current version from package
+    try:
+        import importlib.metadata
+        package_version = importlib.metadata.version("commitcraft")
+    except:
+        package_version = "unknown"
+
     # Create the hook script based on interactive mode
     if interactive:
-        hook_script = '''#!/bin/sh
+        hook_script = f'''#!/bin/sh
 # CommitCraft Git Hook (Interactive Mode)
 # Automatically generates commit messages using AI with optional CommitClues
+# Hook Version: {package_version}
 
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
+
+# Check hook version
+HOOK_VERSION="{package_version}"
+INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
+
+if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
+    echo "⚠️  CommitCraft hook is outdated (hook: $HOOK_VERSION, installed: $INSTALLED_VERSION)" >&2
+    echo "   Update with: CommitCraft hook --uninstall && CommitCraft hook" >&2
+    echo "" >&2
+fi
 
 # Only generate message for regular commits (not merge, squash, etc.)
 if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
@@ -590,44 +628,48 @@ if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
     printf "Your choice (b/f/d/r/n) [n]: "
     read -r COMMIT_TYPE
 
-    # Build CommitCraft command based on user input
-    COMMITCRAFT_CMD="CommitCraft"
+    # Build CommitCraft arguments based on user input
+    COMMITCRAFT_ARGS=""
 
     case "$COMMIT_TYPE" in
         b|B)
             printf "Describe the bug fix (optional): "
             read -r BUG_DESC
             if [ -n "$BUG_DESC" ]; then
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --bug-desc \"$BUG_DESC\""
+                COMMITCRAFT_ARGS="--bug-desc"
+                COMMITCRAFT_DESC="$BUG_DESC"
             else
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --bug"
+                COMMITCRAFT_ARGS="--bug"
             fi
             ;;
         f|F)
             printf "Describe the feature (optional): "
             read -r FEAT_DESC
             if [ -n "$FEAT_DESC" ]; then
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --feat-desc \"$FEAT_DESC\""
+                COMMITCRAFT_ARGS="--feat-desc"
+                COMMITCRAFT_DESC="$FEAT_DESC"
             else
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --feat"
+                COMMITCRAFT_ARGS="--feat"
             fi
             ;;
         d|D)
             printf "Describe the documentation change (optional): "
             read -r DOCS_DESC
             if [ -n "$DOCS_DESC" ]; then
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --docs-desc \"$DOCS_DESC\""
+                COMMITCRAFT_ARGS="--docs-desc"
+                COMMITCRAFT_DESC="$DOCS_DESC"
             else
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --docs"
+                COMMITCRAFT_ARGS="--docs"
             fi
             ;;
         r|R)
             printf "Describe the refactoring (optional): "
             read -r REFACT_DESC
             if [ -n "$REFACT_DESC" ]; then
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --refact-desc \"$REFACT_DESC\""
+                COMMITCRAFT_ARGS="--refact-desc"
+                COMMITCRAFT_DESC="$REFACT_DESC"
             else
-                COMMITCRAFT_CMD="$COMMITCRAFT_CMD --refact"
+                COMMITCRAFT_ARGS="--refact"
             fi
             ;;
         *)
@@ -636,8 +678,14 @@ if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
     esac
 
     # Generate commit message with CommitCraft
-    # Use eval to properly handle the command with arguments
-    GENERATED_MSG=$(eval "$COMMITCRAFT_CMD")
+    # Pass description as a separate argument to avoid quoting issues
+    if [ -n "$COMMITCRAFT_DESC" ]; then
+        GENERATED_MSG=$(CommitCraft $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC")
+    elif [ -n "$COMMITCRAFT_ARGS" ]; then
+        GENERATED_MSG=$(CommitCraft $COMMITCRAFT_ARGS)
+    else
+        GENERATED_MSG=$(CommitCraft)
+    fi
 
     if [ $? -eq 0 ] && [ -n "$GENERATED_MSG" ]; then
         # Prepend generated message to commit message file
@@ -650,12 +698,23 @@ if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
 fi
 '''
     else:
-        hook_script = '''#!/bin/sh
+        hook_script = f'''#!/bin/sh
 # CommitCraft Git Hook (Non-Interactive Mode)
 # Automatically generates commit messages using AI
+# Hook Version: {package_version}
 
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
+
+# Check hook version
+HOOK_VERSION="{package_version}"
+INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
+
+if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
+    echo "⚠️  CommitCraft hook is outdated (hook: $HOOK_VERSION, installed: $INSTALLED_VERSION)" >&2
+    echo "   Update with: CommitCraft hook --uninstall && CommitCraft hook" >&2
+    echo "" >&2
+fi
 
 # Only generate message for regular commits (not merge, squash, etc.)
 if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
