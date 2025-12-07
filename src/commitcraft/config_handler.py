@@ -1,7 +1,7 @@
 import json
-import os
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Optional
 
 import toml
 import typer
@@ -18,7 +18,7 @@ def validate_url(url: str) -> bool:
     try:
         result = urlparse(url)
         return all([result.scheme, result.netloc])
-    except:
+    except Exception:
         return False
 
 
@@ -60,13 +60,13 @@ def fetch_models(provider, api_key=None, host=None):
 
             client = OpenAI(api_key=api_key, base_url=host)
             return [m.id for m in client.models.list()]
-    except Exception as e:
+    except Exception:
         # typer.secho(f"Debug: {e}", fg=typer.colors.RED)
         return []
     return []
 
 
-def load_existing_config(base_dir: Path):
+def load_existing_config(base_dir):
     for ext in ["toml", "yaml", "json"]:
         config_path = base_dir / f"config.{ext}"
         if config_path.exists():
@@ -84,7 +84,7 @@ def load_existing_config(base_dir: Path):
 
 
 def configure_provider(
-    provider_type: str = None, nickname: str = None, current_config: dict = None
+    provider_type: Optional[str] = None, nickname: Optional[str] = None, current_config: Optional[dict] = None
 ):
     """
     Helper to configure a provider (either main or named).
@@ -320,7 +320,7 @@ def interactive_config():
     }
 
     # Context
-    print("\n[blue]\[Project Context][/blue]")
+    print("\n[blue][Project Context][/blue]")
     if not is_global:
         config["context"]["project_name"] = get_input_with_default(
             "Project Name", config["context"].get("project_name", "")
@@ -336,15 +336,10 @@ def interactive_config():
     existing_guidelines = config["context"].get(
         "commit_guidelines", default["commit_guidelines"]
     )
-    current_guidelines_preview = (
-        existing_guidelines[:50] + "..."
-        if existing_guidelines and len(existing_guidelines) > 50
-        else existing_guidelines
-    )
 
     while True:
         prompt_msg = (
-            f"Commit Guidelines (default/custom/view/skip/keep)"
+            "Commit Guidelines (default/custom/view/skip/keep)"
             if is_edit_mode
             else "Commit Guidelines (default/custom/view/skip)"
         )
@@ -371,7 +366,7 @@ def interactive_config():
             print("[yellow]Invalid choice.[/yellow]")
 
     # Models (Main Default Provider)
-    print("\n[blue]\[Default Model Settings][/blue]")
+    print("\n[blue][Default Model Settings][/blue]")
 
     env_keys_to_save = {}
     main_env_var = None
@@ -406,7 +401,7 @@ def interactive_config():
         pass
 
     # Named Providers
-    print("\n[blue]\[Additional Providers][/blue]")
+    print("\n[blue][Additional Providers][/blue]")
 
     # Edit existing named providers
     if config["providers"]:
@@ -507,7 +502,7 @@ def interactive_config():
                 break
 
     # Emoji
-    print("\n[blue]\[Emoji Settings][/blue]")
+    print("\n[blue][Emoji Settings][/blue]")
     if typer.confirm("Enable Emojis?", default=True):
         current_emoji_conv = config["emoji"].get("emoji_convention", "simple")
         while True:
@@ -550,7 +545,7 @@ def interactive_config():
         print(f"[red]Error saving configuration: {e}[/red]")
 
     # API Keys (.env) handling
-    print("\n[blue]\[API Keys][/blue]")
+    print("\n[blue][API Keys][/blue]")
 
     # Check if main key is missing from our collection but needed
     if main_env_var and main_env_var not in env_keys_to_save and should_configure_main:
