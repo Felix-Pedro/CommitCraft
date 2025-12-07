@@ -5,7 +5,7 @@ from enum import Enum
 from typing import List, Literal, Optional, Union
 
 from jinja2 import Template
-from pydantic import BaseModel, Extra, HttpUrl, conint, root_validator
+from pydantic import BaseModel, Extra, HttpUrl, conint, model_validator
 
 from .defaults import default
 
@@ -116,41 +116,35 @@ class LModel(BaseModel):
     )
     api_key: Optional[str] = None
 
-    @root_validator(pre=True)
-    def set_model_default(cls, values):
+    @model_validator(mode='after')
+    def set_model_default(self):
         # If 'model' is not provided, set it based on 'provider'
-        provider = values.get("provider")
-        if "model" not in values or values["model"] is None:
-            if provider == Provider.ollama:
-                values["model"] = "qwen3"
-            elif provider == Provider.ollama_cloud:
-                values["model"] = "qwen3-coder:480b-cloud"
-            elif provider == Provider.groq:
-                values["model"] = "qwen/qwen3-32b"
-            elif provider == Provider.google:
-                values["model"] = "gemini-2.5-flash"
-            elif provider == Provider.openai:
-                values["model"] = "gpt-3.5-turbo"
-        return values
+        if not self.model:
+            if self.provider == Provider.ollama:
+                self.model = "qwen3"
+            elif self.provider == Provider.ollama_cloud:
+                self.model = "qwen3-coder:480b-cloud"
+            elif self.provider == Provider.groq:
+                self.model = "qwen/qwen3-32b"
+            elif self.provider == Provider.google:
+                self.model = "gemini-2.5-flash"
+            elif self.provider == Provider.openai:
+                self.model = "gpt-3.5-turbo"
+        return self
 
-        @root_validator(pre=True)
-        def validate_provider_requirements(cls, values):
-            provider = values.get("provider")
+    @model_validator(mode='after')
+    def validate_provider_requirements(self):
+        # Enforce that 'model' is not None when using openai_compatible
+        if self.provider == Provider.openai_compatible:
+            if not self.model:
+                raise MissingModelError()
+        return self
 
-            # Enforce that 'model' is not None when using openai_compatible
-            if provider == Provider.openai_compatible:
-                if not values.get("model"):
-                    raise MissingModelError()
-
-            return values
-
-        @root_validator(pre=True)
-        def check_host_for_oai_custom(cls, host, values):
-            provider = values.get("provider")
-            if provider == Provider.openai_compatible and not host:
-                raise MissingHostError()
-
-            return host
+    @model_validator(mode='after')
+    def check_host_for_oai_custom(self):
+        if self.provider == Provider.openai_compatible and not self.host:
+            raise MissingHostError()
+        return self
 
 
 class EmojiConfig(BaseModel):
@@ -178,7 +172,7 @@ def clue_parser(input: CommitCraftInput) -> dict[str, str | bool]:
             #    clues_and_input['diff'] = value
             if value:
                 clues_and_input[key] = (
-                    default.get(key, "") + (":" if default.get(key) else "") + value
+                    default.get(key, "") + (": " if default.get(key) else "") + value
                 )
             else:
                 pass

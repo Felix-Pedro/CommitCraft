@@ -1,9 +1,7 @@
 import os
 import re
-import sys
 import random
 import threading
-import time
 
 # Force color support by default (fixes zsh detection issues)
 # Use --no-color flag or NO_COLOR=1 environment variable to disable
@@ -15,7 +13,7 @@ from commitcraft import commit_craft, get_diff, CommitCraftInput, LModelOptions,
 from .config_handler import interactive_config
 import typer
 from typing import Optional
-from typing_extensions import Annotated, Any
+from typing_extensions import Annotated
 from rich.console import Console
 from rich.theme import Theme
 from rich.live import Live
@@ -35,7 +33,7 @@ err_console = Console(stderr=True, theme=custom_theme, force_terminal=True)
 console = Console(theme=custom_theme, force_terminal=True)
 
 # Configure Rich for Typer's help output
-import rich.console
+import rich.console  # noqa: E402
 rich.console._console = console
 
 def version_callback(value: bool):
@@ -44,7 +42,7 @@ def version_callback(value: bool):
         try:
             import importlib.metadata
             version = importlib.metadata.version("commitcraft")
-        except:
+        except Exception:
             version = "unknown"
         console.print(f"[bold cyan]CommitCraft[/bold cyan] version [green]{version}[/green]")
         raise typer.Exit()
@@ -483,7 +481,7 @@ def main(
             response = re.sub(think_pattern, "", response, flags=re.DOTALL).strip()
             
             if show_thinking:
-                err_console.print(f"[thinking_title]Thinking Process:[/thinking_title]")
+                err_console.print("[thinking_title]Thinking Process:[/thinking_title]")
                 err_console.print(f"[thinking_content]{thinking_content}[/thinking_content]\n")
 
         typer.echo(response)
@@ -538,8 +536,6 @@ def hook(
     • [blue]Global install[/blue]: Sets up git template for all new repositories
     • [red]Uninstall[/red]: Removes the CommitCraft hook
     """
-    import subprocess
-    from pathlib import Path
 
     if uninstall:
         _uninstall_hook(global_hook)
@@ -596,7 +592,7 @@ def _install_hook(global_hook: bool, interactive: bool = True):
             content = f.read()
             if "CommitCraft" not in content:
                 if not typer.confirm(
-                    f"A prepare-commit-msg hook already exists. Overwrite?",
+                    "A prepare-commit-msg hook already exists. Overwrite?",
                     default=False
                 ):
                     console.print("[yellow]Installation cancelled.[/yellow]")
@@ -606,7 +602,7 @@ def _install_hook(global_hook: bool, interactive: bool = True):
     try:
         import importlib.metadata
         package_version = importlib.metadata.version("commitcraft")
-    except:
+    except Exception:
         package_version = "unknown"
 
     # Determine if this is a global or local hook based on the hook_dir
