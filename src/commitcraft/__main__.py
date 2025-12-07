@@ -33,21 +33,28 @@ def find_default_file(filename, context_dir='./.commitcraft'):
             return file_path
     return None
 
-def load_config():
-    """Load configuration from either separate files or a single config file."""
-    
-    # 1. Try Project Level
-    project_dir = './.commitcraft'
-    
-    # Single config file
-    config_file = find_default_file('config', project_dir)
+def merge_configs(base: dict, override: dict) -> dict:
+    """Merge override config into base config."""
+    merged = base.copy()
+    for key, value in override.items():
+        if value is None:
+            continue
+        
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
+
+def load_config_from_dir(directory: str) -> dict:
+    """Loads configuration from a directory."""
+    config_file = find_default_file('config', directory)
     if config_file:
         return load_file(config_file)
 
-    # Separate files
-    context_file = find_default_file('context', project_dir)
-    models_file = find_default_file('models', project_dir)
-    emoji_file = find_default_file('emoji', project_dir)
+    context_file = find_default_file('context', directory)
+    models_file = find_default_file('models', directory)
+    emoji_file = find_default_file('emoji', directory)
 
     if context_file or models_file or emoji_file:
         return {
@@ -55,23 +62,21 @@ def load_config():
             "models": load_file(models_file) if models_file else None,
             "emoji": load_file(emoji_file) if emoji_file else None
         }
-        
-    # 2. Try Global Level
-    global_dir = os.path.join(os.path.expanduser("~"), ".commitcraft")
-    
-    config_file = find_default_file('config', global_dir)
-    if config_file:
-        return load_file(config_file)
-        
-    context_file = find_default_file('context', global_dir)
-    models_file = find_default_file('models', global_dir)
-    emoji_file = find_default_file('emoji', global_dir)
+    return {}
 
-    return {
-        "context": load_file(context_file) if context_file else None,
-        "models": load_file(models_file) if models_file else None,
-        "emoji": load_file(emoji_file) if emoji_file else None
-    }
+def load_config():
+    """Load configuration from Global and Project levels and merge them."""
+    
+    # 1. Global Level
+    global_dir = os.path.join(os.path.expanduser("~"), ".commitcraft")
+    global_config = load_config_from_dir(global_dir)
+
+    # 2. Project Level
+    project_dir = './.commitcraft'
+    project_config = load_config_from_dir(project_dir)
+
+    # 3. Merge
+    return merge_configs(global_config, project_config)
 
 @app.callback(invoke_without_command=True)
 def main(
