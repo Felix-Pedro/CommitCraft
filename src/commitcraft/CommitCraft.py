@@ -5,7 +5,7 @@ from enum import Enum
 from typing import List, Literal, Optional, Union
 
 from jinja2 import Template
-from pydantic import BaseModel, Extra, HttpUrl, conint, model_validator
+from pydantic import BaseModel, HttpUrl, conint, model_validator
 
 from .defaults import default
 
@@ -81,14 +81,13 @@ class EmojiSteps(Enum):
 class LModelOptions(BaseModel):
     """The options for the LLM"""
 
+    model_config = {"extra": "allow"}  # Pydantic v2 syntax for allowing extra fields
+
     num_ctx: Optional[int] = None
     temperature: Optional[float] = None
     max_tokens: Optional[conint(ge=1)] = (
         None  # Ensure max_tokens is a positive integer if provided
     )
-
-    class Config:
-        extra = Extra.allow  # Allows for extra arguments
 
 
 class Provider(str, Enum):
@@ -103,7 +102,7 @@ class Provider(str, Enum):
 
 
 class LModel(BaseModel):
-    """The model object containin the provider, model name, system prompt, option and host"""
+    """The model object containing the provider, model name, system prompt, option and host"""
 
     provider: Provider = Provider.ollama
     model: Optional[str] = (
@@ -230,30 +229,16 @@ def commit_craft(
 
             Ollama = ollama.Client(**client_args)
 
-            if "num_ctx" in model_options.keys():
-                if model_options["num_ctx"]:
-                    return Ollama.generate(
-                        model=model.model,
-                        system=system_prompt,
-                        prompt=prompt,
-                        options=model_options,
-                    )["response"]
-                else:
-                    model_options["num_ctx"] = get_context_size(prompt, system_prompt)
-                    return Ollama.generate(
-                        model=model.model,
-                        system=system_prompt,
-                        prompt=prompt,
-                        options=model_options,
-                    )["response"]
-            else:
+            # Set context size if not explicitly configured
+            if "num_ctx" not in model_options or not model_options["num_ctx"]:
                 model_options["num_ctx"] = get_context_size(prompt, system_prompt)
-                return Ollama.generate(
-                    model=model.model,
-                    system=system_prompt,
-                    prompt=prompt,
-                    options=model_options,
-                )["response"]
+
+            return Ollama.generate(
+                model=model.model,
+                system=system_prompt,
+                prompt=prompt,
+                options=model_options,
+            )["response"]
 
         case "ollama_cloud":
             import ollama
