@@ -38,7 +38,7 @@ CommitCraft --docs
 CommitCraft --refact
 ```
 
-**Result:** The AI receives a hint like "This commit focous on fixing a bug" along with the diff.
+**Result:** The AI receives a hint like "This commit focus on fixing a bug" along with the diff.
 
 ### Detailed Usage (Description Flags)
 
@@ -58,7 +58,7 @@ CommitCraft --docs-desc "Updated API examples for v2.0 endpoints"
 CommitCraft --refact-desc "Extracted authentication logic into separate service"
 ```
 
-**Result:** The AI receives both the default hint AND your specific description, e.g., "This commit focous on fixing a bug: Fixed null pointer exception in user login flow"
+**Result:** The AI receives both the default hint AND your specific description, e.g., "This commit focus on fixing a bug: Fixed null pointer exception in user login flow"
 
 ### Custom Context Clues
 
@@ -86,8 +86,8 @@ CommitCraft --feat-desc "Added user profile page" --docs-desc "Added API documen
 The AI will receive:
 ```
 Clues:
-  This commit focous on a new feature: Added user profile page
-  This commit focous on docs: Added API documentation for profile endpoints
+  This commit focus on a new feature: Added user profile page
+  This commit focus on docs: Added API documentation for profile endpoints
 ```
 
 ### Using CommitClues with Git Hooks
@@ -132,7 +132,7 @@ CommitClues are appended to the user prompt before sending to the AI:
 ################ End of the diff ################
 
 Clues:
-  This commit focous on a new feature: Added dark mode
+  This commit focus on a new feature: Added dark mode
 ```
 
 The AI sees both the code changes and the contextual hints, allowing it to generate more accurate commit messages.
