@@ -28,9 +28,24 @@ from commitcraft import (
     get_diff,
 )
 
-# Default patterns to ignore in diffs (lock files add noise without useful context)
+# Default patterns to ignore in diffs (these files add noise without useful context)
 DEFAULT_IGNORE_PATTERNS = [
+    # Lock files
     "*.lock",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    # Minified/bundled assets
+    "*.min.js",
+    "*.min.css",
+    "*.map",
+    # Auto-generated files
+    "*.snap",
+    "*.pb.go",
+    "*.pb.js",
+    "*_generated.*",
+    "*.d.ts",
+    # Vector graphics (often large/generated)
+    "*.svg",
 ]
 
 from .config_handler import interactive_config
