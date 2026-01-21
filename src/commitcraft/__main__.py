@@ -787,7 +787,17 @@ def init():
 
 
 @app.command("config")
-def config():
+def config(
+    generate_ignore: Annotated[
+        bool,
+        typer.Option(
+            "--generate-ignore",
+            "-i",
+            is_flag=True,
+            help="Generate a [cyan].commitcraft/.ignore[/cyan] file with default patterns",
+        ),
+    ] = False,
+):
     """
     [bold cyan]Interactively creates a configuration file.[/bold cyan]
 
@@ -796,7 +806,62 @@ def config():
     • [yellow]Model selection[/yellow]
     • [magenta]Emoji conventions[/magenta]
     • [blue]Project context[/blue]
+
+    Use [cyan]--generate-ignore[/cyan] to create a .ignore file with default patterns.
     """
+    if generate_ignore:
+        ignore_dir = ".commitcraft"
+        ignore_file = os.path.join(ignore_dir, ".ignore")
+
+        # Create directory if it doesn't exist
+        os.makedirs(ignore_dir, exist_ok=True)
+
+        # Check if file already exists
+        if os.path.exists(ignore_file):
+            console.print(
+                f"[yellow]⚠ {ignore_file} already exists.[/yellow]"
+            )
+            overwrite = typer.confirm("Overwrite?", default=False)
+            if not overwrite:
+                console.print("[dim]Aborted.[/dim]")
+                raise typer.Exit()
+
+        # Write defaults with comments
+        content = """# CommitCraft ignore patterns
+# Files matching these patterns will be excluded from the diff sent to the LLM
+# Uses fnmatch syntax (*, ?, [seq], [!seq])
+
+# Lock files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Minified/bundled assets
+*.min.js
+*.min.css
+*.map
+
+# Auto-generated files
+*.snap
+*.pb.go
+*.pb.js
+*_generated.*
+*.d.ts
+
+# Vector graphics (often large/generated)
+*.svg
+
+# Add your custom patterns below:
+"""
+        with open(ignore_file, "w") as f:
+            f.write(content)
+
+        console.print(
+            f"[green]✓ Created {ignore_file} with default patterns.[/green]"
+        )
+        console.print("[dim]Edit the file to customize which files to ignore.[/dim]")
+        return
+
     interactive_config()
 
 
