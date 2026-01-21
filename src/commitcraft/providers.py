@@ -10,9 +10,6 @@ details like authentication, API endpoints, and option filtering.
 
 import os
 from abc import ABC, abstractmethod
-from typing import Optional
-
-from .defaults import default
 
 
 # Constants for context size calculation (used by Ollama)
@@ -118,6 +115,39 @@ class LLMProvider(ABC):
         """
         pass
 
+    def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
+        """
+        Calculate token usage for the request.
+
+        Args:
+            system_prompt: System/instruction prompt
+            user_prompt: User input prompt
+
+        Returns:
+            Dictionary containing token usage information
+        """
+        combined_text = system_prompt + user_prompt
+        token_count = self._count_tokens(combined_text)
+        
+        return {
+            "token_count": token_count,
+            "estimated_cost": "N/A",  # Providers can override this
+            "model": self.model
+        }
+
+    def _count_tokens(self, text: str) -> int:
+        """
+        Count tokens in text using tiktoken or fallback estimation.
+        """
+        try:
+            import tiktoken
+            # Use cl100k_base encoding (standard for modern LLMs)
+            encoding = tiktoken.get_encoding("cl100k_base")
+            return len(encoding.encode(text))
+        except (ImportError, Exception):
+            # Fallback to character estimation
+            return int(len(text) / CONTEXT_CHAR_TO_TOKEN_RATIO)
+
     def _filter_options(self, allowed_keys: tuple[str, ...]) -> dict:
         """
         Filter model options to only include allowed keys with non-None values.
@@ -180,6 +210,19 @@ class OllamaProvider(LLMProvider):
         except Exception as e:
             raise LLMProviderError(f"Ollama generation failed: {e}") from e
 
+    def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
+        """Calculate token usage and context size for Ollama."""
+        usage = super().calculate_usage(system_prompt, user_prompt)
+        
+        # Calculate context size using the same logic as generate()
+        context_size = self._calculate_context_size(system_prompt, user_prompt)
+        
+        usage.update({
+            "context_size": context_size,
+            "context_utilization": f"{(usage['token_count'] / context_size) * 100:.1f}%"
+        })
+        return usage
+
     def _calculate_context_size(self, system_prompt: str, user_prompt: str) -> int:
         """
         Calculate required context window size for Ollama models.
@@ -211,37 +254,12 @@ class OllamaProvider(LLMProvider):
         min_ctx_val = self.options.get("min_ctx") or MIN_CONTEXT_SIZE
         max_ctx_val = self.options.get("max_ctx") or MAX_CONTEXT_SIZE
 
-        # Method 1: Try tiktoken if available (recommended for accuracy)
-        try:
-            import tiktoken
+        token_count = self._count_tokens(combined_text)
+        
+        # Add 60% buffer: 50% for model response + 10% overhead
+        estimated = int(token_count * 1.6)
 
-            # Use cl100k_base encoding (GPT-3.5/4 tokenizer)
-            # This is close enough for most models (Qwen, Llama, Gemma, Mistral)
-            # as they all use similar BPE tokenization
-            encoding = tiktoken.get_encoding("cl100k_base")
-            token_count = len(encoding.encode(combined_text))
-
-            # Add 60% buffer: 50% for model response + 10% overhead
-            # This buffer was empirically determined to prevent context overflow
-            # while not over-allocating memory
-            estimated = int(token_count * 1.6)
-
-            return min(max(estimated, min_ctx_val), max_ctx_val)
-
-        except ImportError:
-            # tiktoken not installed - use character-based fallback
-            pass
-        except Exception:
-            # tiktoken failed for some reason - fall back gracefully
-            # This could happen with very large texts or encoding issues
-            pass
-
-        # Method 2: Character-based ratio estimation (fallback)
-        # This provides reasonable estimates without additional dependencies
-        input_len = len(combined_text)
-        estimated_tokens = int(input_len * CONTEXT_CHAR_TO_TOKEN_RATIO)
-
-        return min(max(estimated_tokens, min_ctx_val), max_ctx_val)
+        return min(max(estimated, min_ctx_val), max_ctx_val)
 
 
 class OllamaCloudProvider(LLMProvider):

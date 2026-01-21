@@ -7,7 +7,6 @@ CLI args > Project config > Global config > Defaults
 """
 
 import os
-from pathlib import Path
 
 from .CommitCraft import LModel, LModelOptions
 

@@ -84,7 +84,9 @@ def load_existing_config(base_dir):
 
 
 def configure_provider(
-    provider_type: Optional[str] = None, nickname: Optional[str] = None, current_config: Optional[dict] = None
+    provider_type: Optional[str] = None,
+    nickname: Optional[str] = None,
+    current_config: Optional[dict] = None,
 ):
     """
     Helper to configure a provider (either main or named).
@@ -375,7 +377,10 @@ def interactive_config():
 
     # For project configs, offer to skip and use global settings
     if not is_global:
-        if typer.confirm("Configure project-specific model settings? (No = use global settings)", default=True):
+        if typer.confirm(
+            "Configure project-specific model settings? (No = use global settings)",
+            default=True,
+        ):
             should_configure_main = True
         else:
             should_configure_main = False

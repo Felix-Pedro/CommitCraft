@@ -1,5 +1,5 @@
-default={
-    'commit_guidelines' : '''
+default = {
+    "commit_guidelines": """
     - Never ask for follow-up questions.
     - Don't ask questions.
     - Don't talk about yourself.
@@ -17,9 +17,9 @@ default={
     - If there are many changes focus on the main ones.
     - The first row shall be the title of your message, so make it simple and informative.
     - Do not introduce your message!
-    ''',
-    'emoji_guidelines' :{
-        'full':'''
+    """,
+    "emoji_guidelines": {
+        "full": """
     For the title of your message use the GitMoji Convention, here is some help emoji ; description:
         🎨 ; Improve structure / format of the code.
         ⚡️ ; Improve performance.
@@ -95,8 +95,8 @@ default={
         🧵 ; Add or update code related to multithreading or concurrency.
         🦺 ; Add or update code related to validation.
     The title shall be formated as "{emoji} {title}"
-    ''',
-        'simple':'''
+    """,
+        "simple": """
     For the title of your message use the GitMoji Convention, here is some help emoji ; description:
         ⚡️ ; Improve performance.
         🐛 ; Fix a bug.
@@ -137,13 +137,13 @@ default={
         🩺 ; Add or update healthcheck.
         💸 ; Add sponsorships or money related infrastructure.
     The title shall be formated as "{emoji} {title}"
-    ''',
-    'emoji_agent':'''
+    """,
+        "emoji_agent": """
     Your mission is to receive a commit message and return an emoji based on the following guide.
     Do not explain yourself, return only the single emoji.
-    '''
+    """,
     },
-    "system_prompt":'''
+    "system_prompt": """
     # Proposure
 
     You are a commit message helper {% if project_name or project_language %} for {{ project_name }} {% if project_language %} a project written in {{ project_language }} {% endif %} {% endif %} {% if project_description %} described as:
@@ -155,8 +155,8 @@ default={
     Your only task is to receive a git diff and maybe some clues, then return a simple commit message following these guidelines:
 
     {{ commit_guidelines }}
-    ''',
-    "input": '''
+    """,
+    "input": """
     ############# Beginning of the diff #############
     {{ diff }}
     ################ End of the diff ################
@@ -168,10 +168,9 @@ default={
         {{ refact }}
         {{ custom_clue }}
     {% endif %}
-    ''',
-    'bug' : 'This commit focus on fixing a bug',
-    'feat' : 'This commit focus on a new feature',
-    'docs' : 'This commit focus on docs',
-    'refact' : 'This commit focus on refactoring'
-
+    """,
+    "bug": "This commit focus on fixing a bug",
+    "feat": "This commit focus on a new feature",
+    "docs": "This commit focus on docs",
+    "refact": "This commit focus on refactoring",
 }
