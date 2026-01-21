@@ -1,13 +1,22 @@
+"""
+CommitCraft Core Module
+
+This module provides the main functionality for generating commit messages
+using Large Language Models (LLMs). It handles git diff retrieval, diff filtering,
+prompt construction, and LLM interactions through various providers.
+"""
+
 import fnmatch
 import os
 import subprocess
 from enum import Enum
-from typing import List, Literal, Optional, Union
+from typing import Literal
 
 from jinja2 import Template
-from pydantic import BaseModel, Extra, HttpUrl, conint, model_validator
+from pydantic import BaseModel, Extra, HttpUrl, field_validator, model_validator
 
 from .defaults import default
+from .providers import LLMProviderError, get_provider
 
 
 # Custom exceptions to be raised when using openai_compatible provider.
@@ -24,23 +33,65 @@ class MissingHostError(ValueError):
 
 
 def get_diff() -> str:
-    """Retrieve the staged changes in the git repository."""
-    diff = subprocess.run(
-        ["git", "diff", "--staged", "-M"], capture_output=True, text=True
-    )
-    return diff.stdout
+    """
+    Retrieve the staged changes in the git repository.
+
+    Executes 'git diff --staged -M' to get staged changes with move detection.
+
+    Returns:
+        The diff output as a string
+
+    Raises:
+        RuntimeError: If git command fails or git is not installed
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--staged", "-M"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() if e.stderr else "Unknown git error"
+        raise RuntimeError(f"Git command failed: {error_msg}") from e
+    except FileNotFoundError:
+        raise RuntimeError(
+            "Git is not installed or not in PATH. Please install git to use CommitCraft."
+        ) from None
 
 
-def matches_pattern(file_path: str, ignored_patterns: List[str]) -> bool:
-    """Check if the file matches any of the ignore patterns using fnmatch"""
-    for pattern in ignored_patterns:
-        if fnmatch.fnmatch(file_path, pattern):
-            return True
-    return False
+def matches_pattern(file_path: str, ignored_patterns: list[str]) -> bool:
+    """
+    Check if a file path matches any of the ignore patterns.
+
+    Uses fnmatch for glob-style pattern matching (*, ?, [seq], [!seq]).
+
+    Args:
+        file_path: Path to check
+        ignored_patterns: List of glob patterns to match against
+
+    Returns:
+        True if the file matches any pattern, False otherwise
+    """
+    return any(fnmatch.fnmatch(file_path, pattern) for pattern in ignored_patterns)
 
 
-def filter_diff(diff_output: str, ignored_patterns: List):
-    """Filters the diff output to exclude files listed in ignored_files."""
+def filter_diff(diff_output: str, ignored_patterns: list[str]) -> str:
+    """
+    Filter git diff output to exclude files matching ignore patterns.
+
+    Parses the diff output line-by-line, identifying file boundaries using
+    'diff --git' markers, and excludes entire diff blocks for files that
+    match any ignore pattern.
+
+    Args:
+        diff_output: Raw git diff output
+        ignored_patterns: List of glob patterns for files to exclude
+
+    Returns:
+        Filtered diff output with excluded files removed
+    """
     filtered_diff = []
     in_diff_block = False
     current_file = None
@@ -63,13 +114,6 @@ def filter_diff(diff_output: str, ignored_patterns: List):
     return "\n".join(filtered_diff)
 
 
-def get_context_size(diff: str, system: str) -> int:
-    """Based on the git diff and system prompt estimate ollama context window needed"""
-    input_len = len(system) + len(diff)
-    num_ctx = int(min(max(input_len * 2.64, 1024), 128000))
-    return num_ctx
-
-
 class EmojiSteps(Enum):
     """If emoji should be performed in the same step as the message or in a separated one"""
 
@@ -79,13 +123,24 @@ class EmojiSteps(Enum):
 
 
 class LModelOptions(BaseModel):
-    """The options for the LLM"""
+    """
+    Configuration options for LLM models.
 
-    num_ctx: Optional[int] = None
-    temperature: Optional[float] = None
-    max_tokens: Optional[conint(ge=1)] = (
-        None  # Ensure max_tokens is a positive integer if provided
-    )
+    Supports common parameters like temperature, max_tokens, and num_ctx (for Ollama).
+    Extra parameters are allowed to support provider-specific options.
+    """
+
+    num_ctx: int | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+
+    @field_validator("max_tokens")
+    @classmethod
+    def validate_max_tokens(cls, v: int | None) -> int | None:
+        """Ensure max_tokens is a positive integer if provided."""
+        if v is not None and v < 1:
+            raise ValueError("max_tokens must be at least 1")
+        return v
 
     class Config:
         extra = Extra.allow  # Allows for extra arguments
@@ -103,22 +158,32 @@ class Provider(str, Enum):
 
 
 class LModel(BaseModel):
-    """The model object containin the provider, model name, system prompt, option and host"""
+    """
+    Model configuration containing provider, model name, system prompt, options, and host.
+
+    Attributes:
+        provider: The LLM provider (ollama, openai, google, groq, openai_compatible)
+        model: Model name/identifier (auto-set based on provider if not provided)
+        system_prompt: Optional custom system prompt
+        options: Optional model parameters (temperature, max_tokens, etc.)
+        host: Optional host URL (required for openai_compatible, optional for ollama)
+        api_key: Optional API key for authentication
+    """
 
     provider: Provider = Provider.ollama
-    model: Optional[str] = (
-        None  # Most providers have default, required for openai_compatible
+    model: str | None = (
+        None  # Most providers have defaults, required for openai_compatible
     )
-    system_prompt: Optional[str] = None
-    options: Optional[LModelOptions] = None
-    host: Optional[Union[Literal["ollama_cloud"], HttpUrl]] = (
+    system_prompt: str | None = None
+    options: LModelOptions | None = None
+    host: Literal["ollama_cloud"] | HttpUrl | None = (
         None  # required for openai_compatible
     )
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def set_model_default(self):
-        # If 'model' is not provided, set it based on 'provider'
+        """Set default model name based on provider if not specified."""
         if not self.model:
             if self.provider == Provider.ollama:
                 self.model = "qwen3"
@@ -132,28 +197,51 @@ class LModel(BaseModel):
                 self.model = "gpt-3.5-turbo"
         return self
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_provider_requirements(self):
+        """Validate that required fields are set for specific providers."""
         # Enforce that 'model' is not None when using openai_compatible
         if self.provider == Provider.openai_compatible:
             if not self.model:
                 raise MissingModelError()
         return self
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_host_for_oai_custom(self):
+        """Ensure host is provided for openai_compatible provider."""
         if self.provider == Provider.openai_compatible and not self.host:
             raise MissingHostError()
         return self
 
 
 class EmojiConfig(BaseModel):
+    """
+    Configuration for emoji usage in commit messages.
+
+    Attributes:
+        emoji_steps: When to add emojis (single step or 2-step)
+        emoji_convention: Which emoji convention to use (simple, full, or custom string)
+        emoji_model: Optional separate model for emoji selection
+    """
+
     emoji_steps: EmojiSteps = EmojiSteps.single
     emoji_convention: str = "simple"
-    emoji_model: Optional[LModel] = None
+    emoji_model: LModel | None = None
 
 
 class CommitCraftInput(BaseModel):
+    """
+    Input data for commit message generation.
+
+    Attributes:
+        diff: Git diff output
+        bug: Bug fix indicator (bool or description string)
+        feat: Feature indicator (bool or description string)
+        docs: Documentation indicator (bool or description string)
+        refact: Refactoring indicator (bool or description string)
+        custom_clue: Custom clue for the LLM (bool or description string)
+    """
+
     diff: str
     bug: str | bool = False
     feat: str | bool = False
@@ -163,235 +251,94 @@ class CommitCraftInput(BaseModel):
 
 
 def clue_parser(input: CommitCraftInput) -> dict[str, str | bool]:
+    """
+    Parse commit clues from input and merge with default templates.
+
+    Converts boolean clue flags to their descriptive text from defaults,
+    and appends user-provided descriptions to the default templates.
+
+    Args:
+        input: CommitCraftInput with diff and optional clues
+
+    Returns:
+        Dictionary of parsed clues ready for template rendering
+    """
     clues_and_input = {}
     for key, value in input.dict().items():
         if value is True:
+            # Boolean flag - use default description
             clues_and_input[key] = default.get(key, key)
-        else:
-            # if key == 'diff':
-            #    clues_and_input['diff'] = value
-            if value:
-                clues_and_input[key] = (
-                    default.get(key, "") + (": " if default.get(key) else "") + value
-                )
-            else:
-                pass
+        elif value and value is not False:
+            # User provided description - append to default template
+            default_text = default.get(key, "")
+            separator = ": " if default_text else ""
+            clues_and_input[key] = f"{default_text}{separator}{value}"
     return clues_and_input
 
 
 def commit_craft(
     input: CommitCraftInput,
-    models: LModel = LModel(),  # Will support multiple models in 1.1.0 but for now only one
-    context: dict[str, str] = {},
-    emoji: Optional[EmojiConfig] = None,
+    models: LModel = LModel(),
+    context: dict[str, str] | None = None,
+    emoji: EmojiConfig | None = None,
     debug_prompt: bool = False,
 ) -> str:
-    """CommitCraft generates a system message and requests a commit message based on staged changes"""
+    """
+    Generate a commit message using an LLM based on staged git changes.
 
-    system_prompt = (
-        models.system_prompt
-        if models.system_prompt
-        else default.get("system_prompt", "")
-    )
-    system_prompt = Template(system_prompt)
-    system_prompt = system_prompt.render(**context)
+    This is the main entry point for CommitCraft. It processes the input diff,
+    applies clues and context, constructs prompts using Jinja2 templates,
+    and calls the appropriate LLM provider to generate a commit message.
 
-    input_wrapper = Template(default.get("input", ""))
+    Args:
+        input: CommitCraftInput containing the diff and optional clues
+        models: LModel configuration specifying provider, model, and options
+        context: Optional project context (name, language, description, guidelines)
+        emoji: Optional emoji configuration for GitMoji support
+        debug_prompt: If True, return the prompt instead of calling the LLM
+
+    Returns:
+        Generated commit message string
+
+    Raises:
+        LLMProviderError: If the provider fails to generate a response
+        RuntimeError: If git operations fail
+    """
+    context = context or {}
+
+    # Build system prompt from template
+    system_prompt_template = models.system_prompt or default.get("system_prompt", "")
+    system_prompt = Template(system_prompt_template).render(**context)
+
+    # Build user prompt from diff and clues
+    input_template = Template(default.get("input", ""))
     input_data = clue_parser(input)
-    prompt = input_wrapper.render(**input_data)
+    user_prompt = input_template.render(**input_data)
 
-    if emoji:
-        if emoji.emoji_steps == EmojiSteps.single:
-            if emoji.emoji_convention in ("simple", "full"):
-                system_prompt += f"\n\n{default.get('emoji_guidelines', {}).get(emoji.emoji_convention, '')}"
-            elif emoji.emoji_convention:
-                system_prompt += f"\n\n{emoji.emoji_convention}"
+    # Add emoji guidelines to system prompt if enabled
+    if emoji and emoji.emoji_steps == EmojiSteps.single:
+        if emoji.emoji_convention in ("simple", "full"):
+            emoji_guide = default.get("emoji_guidelines", {}).get(
+                emoji.emoji_convention, ""
+            )
+            system_prompt += f"\n\n{emoji_guide}"
+        elif emoji.emoji_convention:
+            system_prompt += f"\n\n{emoji.emoji_convention}"
 
-    model = models
-    model_options = model.options.dict() if model.options else {}
+    # Debug mode: return prompts without calling LLM
     if debug_prompt:
-        return f"system_prompt:\n{system_prompt}\n\n prompt:\n{prompt}"
-    match model.provider:
-        case "ollama":
-            import ollama
+        return f"system_prompt:\n{system_prompt}\n\nprompt:\n{user_prompt}"
 
-            # Ollama local instance initialization
-            client_args = {}
-            host_val = str(model.host) if model.host else os.getenv("OLLAMA_HOST")
-            if host_val:
-                client_args["host"] = host_val
-
-            # API key support for authenticated Ollama instances
-            ollama_api_key = (
-                model.api_key if model.api_key else os.getenv("OLLAMA_API_KEY")
-            )
-            if ollama_api_key:
-                client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
-
-            Ollama = ollama.Client(**client_args)
-
-            if "num_ctx" in model_options.keys():
-                if model_options["num_ctx"]:
-                    return Ollama.generate(
-                        model=model.model,
-                        system=system_prompt,
-                        prompt=prompt,
-                        options=model_options,
-                    )["response"]
-                else:
-                    model_options["num_ctx"] = get_context_size(prompt, system_prompt)
-                    return Ollama.generate(
-                        model=model.model,
-                        system=system_prompt,
-                        prompt=prompt,
-                        options=model_options,
-                    )["response"]
-            else:
-                model_options["num_ctx"] = get_context_size(prompt, system_prompt)
-                return Ollama.generate(
-                    model=model.model,
-                    system=system_prompt,
-                    prompt=prompt,
-                    options=model_options,
-                )["response"]
-
-        case "ollama_cloud":
-            import ollama
-
-            # Ollama Cloud configuration per https://docs.ollama.com/cloud#python
-            client_args = {
-                "host": "https://ollama.com"
-            }
-
-            # Cloud requires API key authentication
-            ollama_api_key = (
-                model.api_key if model.api_key else os.getenv("OLLAMA_API_KEY")
-            )
-            if ollama_api_key:
-                client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
-
-            Ollama = ollama.Client(**client_args)
-
-            # Ollama Cloud uses chat API, not generate API
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ]
-
-            # Filter options for chat API (cloud doesn't use num_ctx)
-            chat_options = {k: v for k, v in model_options.items() if k != "num_ctx"}
-
-            response = Ollama.chat(
-                model=model.model,
-                messages=messages,
-                options=chat_options if chat_options else None,
-            )
-            return response["message"]["content"]
-
-        case "groq":
-            from groq import Groq
-
-            client = Groq(
-                api_key=model.api_key if model.api_key else os.getenv("GROQ_API_KEY")
-            )
-            groq_configs = ("top_p", "temperature", "max_tokens")
-            groq_options = {
-                config: model_options.get(config) if model_options.get(config) else None
-                for config in (set(tuple(model_options.keys())) & set(groq_configs))
-            }
-            return (
-                client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
-                    model=model.model,
-                    stream=False,
-                    **groq_options,
-                )
-                .choices[0]
-                .message.content
-            )
-
-        case "google":
-            from google import genai
-            from google.genai import types
-
-            client = genai.Client(
-                api_key=model.api_key if model.api_key else os.getenv("GOOGLE_API_KEY")
-            )
-
-            google_config = {}
-            if system_prompt:
-                google_config["system_instruction"] = system_prompt
-
-            if model_options:
-                if model_options.get("temperature"):
-                    google_config["temperature"] = model_options.get("temperature")
-                if model_options.get("max_tokens"):
-                    google_config["max_output_tokens"] = model_options.get("max_tokens")
-                if model_options.get("top_p"):
-                    google_config["top_p"] = model_options.get("top_p")
-
-            response = client.models.generate_content(
-                model=model.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(**google_config),
-            )
-            return response.text
-
-        case "openai":
-            from openai import OpenAI
-
-            client = OpenAI(
-                api_key=model.api_key if model.api_key else os.getenv("OPENAI_API_KEY")
-            )
-            openai_configs = ("top_p", "temperature", "max_tokens")
-            openai_options = {
-                config: model_options.get(config) if model_options.get(config) else None
-                for config in (set(tuple(model_options.keys())) & set(openai_configs))
-            }
-            return (
-                client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
-                    model=model.model,
-                    stream=False,
-                    **openai_options,
-                )
-                .choices[0]
-                .message.content
-            )
-
-        case "openai_compatible":
-            from openai import OpenAI
-
-            client = OpenAI(
-                api_key=model.api_key
-                if model.api_key
-                else os.getenv("CUSTOM_API_KEY", default="nokey"),
-                base_url=str(model.host),
-            )
-            openai_configs = ("top_p", "temperature", "max_tokens")
-            openai_options = {
-                config: model_options.get(config) if model_options.get(config) else None
-                for config in (set(tuple(model_options.keys())) & set(openai_configs))
-            }
-            return (
-                client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
-                    model=model.model,
-                    stream=False,
-                    **openai_options,
-                )
-                .choices[0]
-                .message.content
-            )
-
-        case _:
-            raise NotImplementedError("provider not found")
+    # Get provider instance and generate response
+    try:
+        model_options = models.options.dict() if models.options else {}
+        provider = get_provider(
+            provider_name=models.provider.value,
+            model=models.model or "qwen3",  # Fallback to default model
+            api_key=models.api_key,
+            host=str(models.host) if models.host else None,
+            options=model_options,
+        )
+        return provider.generate(system_prompt, user_prompt)
+    except LLMProviderError as e:
+        raise RuntimeError(f"Failed to generate commit message: {e}") from e
