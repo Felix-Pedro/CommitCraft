@@ -35,6 +35,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
   - Supports local/unauthenticated services (LocalAI, local vLLM, local Ollama) without requiring dummy keys
   - Clear distinction between: mandatory keys (OpenAI, Groq, Google), optional keys (Ollama), and service-dependent keys (OpenAI-compatible)
 - **Context Size Calculation**: Fixed Ollama context size calculation to use a dedicated helper function with documented algorithm. Context size is now automatically calculated when `num_ctx` is not provided or set to `None/0`.
+- **Empty Diff Validation**: Added validation to prevent wasted API calls when there are no staged changes or all changes are filtered out by ignore patterns. Now displays a helpful message: "No staged changes to analyze. Either there are no staged changes, or all files are ignored by the filter patterns."
 - **Type Hints Modernization**: Updated all type hints to use modern Python 3.10+ syntax (`str | None` instead of `Optional[str]`, `dict[str, str]` instead of `Dict[str, str]`), improving consistency and readability.
 - **Dead Code Removal**: Removed commented-out code blocks in `clue_parser()` and other functions, improving code cleanliness.
 
