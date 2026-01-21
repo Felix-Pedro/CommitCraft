@@ -1,11 +1,11 @@
-[tool.poetry]
+[project]
 name = "commitcraft"
 version = "1.0.0"
-description = "A simple tool to use LLM and git diff to craft meaningfull commit messages."
-authors = ["Felix-Pedro <felix@auneria.com>"]
+description = "A simple tool to use LLM and git diff to craft meaningful commit messages."
+authors = [{ name = "Felix-Pedro", email = "felix@auneria.com" }]
 license = "AGPL-3.0"
 readme = "README.md"
-repository = "https://github.com/Felix-Pedro/CommitCraft"
+requires-python = ">=3.10"
 keywords = [
     "llm",
     "commit",
@@ -22,49 +22,46 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-python-dotenv = "^1.0.1"
-pyyaml = "^6.0.2"
-tomli = "^2.0.2"
-requests = "^2.32.4"
-toml = "^0.10.2"
-ollama = "^0.3.3"
-pydantic = "^2.9.2"
-openai = { version = "^1.52.0", optional = true }
-groq = { version = "^0.11.0", optional = true }
-google-genai = { version = "^0.2.0", optional = true }
-typer = "^0.12.5"
-click = ">=8.1.0,<8.2.0"
-jinja2 = "^3.1.6"
-rich = "^14.2.0"
-h11 = '^0.16.0'
-urllib3 = '^2.6.0'
+dependencies = [
+    "python-dotenv>=1.0.1",
+    "pyyaml>=6.0.2",
+    "tomli>=2.0.2",
+    "requests>=2.32.4",
+    "toml>=0.10.2",
+    "ollama>=0.3.3",
+    "pydantic>=2.9.2",
+    "typer>=0.12.5",
+    "click>=8.1.0,<8.2.0",
+    "jinja2>=3.1.6",
+    "rich>=14.2.0",
+    "h11>=0.16.0",
+    "urllib3>=2.6.0",
+    "openai>=1.52.0",
+    "groq>=0.11.0",
+    "google-genai>=0.2.0",
+]
 
-[tool.poetry.extras]
-openai = ["openai"]
-groq = ["groq"]
-google = ["google-genai"]
-all-providers = ["openai", "groq", "google-genai"]
+[project.scripts]
+CommitCraft = "commitcraft.__main__:app"
+
+[project.urls]
+Repository = "https://github.com/Felix-Pedro/CommitCraft"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-CommitCraft = "commitcraft.__main__:app"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "sphinx (>=7.0.0,<8.0.0)",
-    "sphinx-rtd-theme (>=3.0.2,<4.0.0)",
-    "myst-parser (>=4.0.1,<5.0.0)",
-    "mkdocs (>=1.6.1,<2.0.0)",
-    "mkdocs-material (>=9.7.0,<10.0.0)",
-    "mkdocstrings[python] (>=1.0.0,<2.0.0)",
-    "mkdocs-typer (>=0.0.3,<0.0.4)",
-    "mkdocs-include-markdown-plugin (>=7.2.0,<8.0.0)",
-    "mkdocs-click (>=0.9.0,<0.10.0)",
-    "nox (>=2025.11.12,<2026.0.0)",
-    "pytest (>=9.0.2,<10.0.0)",
+    "sphinx>=7.0.0,<8.0.0",
+    "sphinx-rtd-theme>=3.0.2,<4.0.0",
+    "myst-parser>=4.0.1,<5.0.0",
+    "mkdocs>=1.6.1,<2.0.0",
+    "mkdocs-material>=9.7.0,<10.0.0",
+    "mkdocstrings[python]>=1.0.0,<2.0.0",
+    "mkdocs-typer>=0.0.3,<0.0.4",
+    "mkdocs-include-markdown-plugin>=7.2.0,<8.0.0",
+    "mkdocs-click>=0.9.0,<0.10.0",
+    "nox>=2025.11.12,<2026.0.0",
+    "pytest>=9.0.2,<10.0.0",
 ]
