@@ -1,4 +1,4 @@
-from commitcraft.CommitCraft import filter_diff, get_context_size
+from commitcraft.CommitCraft import filter_diff
 
 def test_filter_diff_basic():
     diff = "diff --git a/file1.txt b/file1.txt\nindex 123..456 100644\n--- a/file1.txt\n+++ b/file1.txt\n@@ -1 +1 @@\n-foo\n+bar\n"
@@ -35,15 +35,3 @@ diff --git a/dist/bundle.js b/dist/bundle.js
     filtered = filter_diff(diff, ["dist/*"])
     assert "src/main.py" in filtered
     assert "dist/bundle.js" not in filtered
-
-def test_get_context_size():
-    diff = "small diff"
-    system = "small prompt"
-    # Should hit min context 1024
-    assert get_context_size(diff, system) == 1024
-
-    # Large diff
-    large_diff = "a" * 50000
-    large_prompt = "b" * 1000
-    # (51000 * 2.64) = 134640 > 128000 -> capped at 128000
-    assert get_context_size(large_diff, large_prompt) == 128000

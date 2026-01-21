@@ -612,6 +612,14 @@ def main(
             help="[yellow]Describes refactoring[/yellow]",
         ),
     ] = None,
+    amend: Annotated[
+        bool,
+        typer.Option(
+            rich_help_panel="Commit Clues",
+            is_flag=True,
+            help="Generate message for [yellow]git commit --amend[/yellow]",
+        ),
+    ] = False,
     context_clue: Annotated[
         Optional[str],
         typer.Option(
@@ -667,7 +675,7 @@ def main(
         load_dotenv(os.path.join(os.getcwd(), "CommitCraft.env"))
 
         # Get the git diff
-        diff = get_diff()
+        diff = get_diff(amend=amend)
 
         # Build ignore patterns: defaults + .commitcraft/.ignore + CLI --ignore
         ignored_patterns = list(DEFAULT_IGNORE_PATTERNS)
@@ -761,8 +769,8 @@ def main(
             # **extra_model_options  # Merge extra model options here
         )
 
-        cli_options = lmodel_options.dict()
-        config_options = model_config.options.dict() if model_config.options else {}
+        cli_options = lmodel_options.model_dump()
+        config_options = model_config.options.model_dump() if model_config.options else {}
         model_options = {
             config: cli_options.get(config)
             if cli_options.get(config, False)
