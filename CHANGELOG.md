@@ -7,7 +7,13 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [unreleased]
 
-No unreleased changes yet.
+### Added
+
+- **Loading Bits**: Added a few more loading phrases to entratain while generate the message
+- **Hook Skip Option**: Added `COMMITCRAFT_SKIP=1` environment variable to skip CommitCraft for a single commit. Use `COMMITCRAFT_SKIP=1 git commit` to bypass the hook temporarily.
+- **Unhook Command**: Added `CommitCraft unhook` command as a more discoverable alias for `CommitCraft hook --uninstall`. Supports `--global` / `-g` flag to remove global hooks.
+- **Auto-Skip on `-m` Flag**: Hook now automatically skips when using `git commit -m "message"` since the user has already provided their own commit message.
+- **Interactive Skip Option**: Added `[s] Skip (write message manually)` option to the interactive hook menu, allowing users to bypass AI generation for a single commit.
 
 ---
 
