@@ -11,6 +11,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 - **Package Manager Migration**: Migrated from Poetry to uv for faster dependency management and simpler tooling. Development commands now use `uv sync` and `uv run` instead of `poetry install` and `poetry run`. Both `uv tool install` and `pipx install` are supported for end-user installation.
 - **All Providers by Default**: The default installation now includes all providers (Ollama, OpenAI, Groq, Google) out of the box.
+- **Provider System Refactored**: Internal provider implementation now uses a registry pattern with abstract base classes (`LLMProvider`) for better maintainability and extensibility. This is a non-breaking internal refactor that makes it easier to add new LLM providers. All existing provider names, CLI arguments, and configuration options work identically.
 
 ### Added
 
@@ -21,6 +22,28 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - **Unhook Command**: Added `CommitCraft unhook` command as a more discoverable alias for `CommitCraft hook --uninstall`. Supports `--global` / `-g` flag to remove global hooks.
 - **Auto-Skip on `-m` Flag**: Hook now automatically skips when using `git commit -m "message"` since the user has already provided their own commit message.
 - **Interactive Skip Option**: Added `[s] Skip (write message manually)` option to the interactive hook menu, allowing users to bypass AI generation for a single commit.
+- **Configuration Helper Module**: Added `config_resolver.py` with dedicated functions for resolving provider configurations, named profiles, and applying CLI overrides, improving code organization and testability.
+
+### Fixed
+
+- **Git Error Handling**: Added comprehensive error handling for `get_diff()` function. Now properly catches and reports errors when git is not installed or when git commands fail (e.g., not in a git repository).
+- **Provider API Key Handling**: Improved API key resolution for providers that don't require authentication. Providers now explicitly declare whether they require API keys via `requires_api_key` attribute, preventing unnecessary API key errors for services like local Ollama instances or API-key-free compatible endpoints.
+- **Context Size Calculation**: Fixed Ollama context size calculation to use a dedicated helper function with documented algorithm. Context size is now automatically calculated when `num_ctx` is not provided or set to `None/0`.
+- **Type Hints Modernization**: Updated all type hints to use modern Python 3.10+ syntax (`str | None` instead of `Optional[str]`, `dict[str, str]` instead of `Dict[str, str]`), improving consistency and readability.
+- **Dead Code Removal**: Removed commented-out code blocks in `clue_parser()` and other functions, improving code cleanliness.
+
+### Improved
+
+- **Comprehensive Docstrings**: Added detailed docstrings to all core functions including parameter descriptions, return types, raised exceptions, and usage examples. Functions like `get_diff()`, `filter_diff()`, `matches_pattern()`, `clue_parser()`, and `commit_craft()` now have complete documentation.
+- **Pydantic Validation**: Enhanced `LModelOptions` with explicit field validators (e.g., ensuring `max_tokens` is positive), providing better error messages and input validation.
+- **Test Coverage**: Updated unit tests to cover new error handling paths, including git command failures and missing git installations. Tests now verify that proper exceptions are raised with appropriate error messages.
+- **Error Messages**: Improved error messages throughout the codebase to be more descriptive and actionable, helping users quickly diagnose configuration and runtime issues.
+
+### Developer Experience
+
+- **Provider Registry Pattern**: Introduced `providers.py` module with `LLMProvider` abstract base class and provider-specific implementations (`OllamaProvider`, `GoogleProvider`, `OpenAIProvider`, etc.). New providers can be added by implementing the base class and registering in `PROVIDER_REGISTRY`.
+- **Simplified Core Logic**: Reduced `commit_craft()` function from ~220 lines to ~60 lines by extracting provider-specific logic into dedicated classes, significantly improving maintainability.
+- **Consistent Error Handling**: Established consistent error handling patterns using custom exceptions (`LLMProviderError`, `APIKeyMissingError`) that propagate meaningful error messages to users.
 
 ---
 
