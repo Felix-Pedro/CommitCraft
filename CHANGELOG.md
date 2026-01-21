@@ -27,7 +27,13 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 ### Fixed
 
 - **Git Error Handling**: Added comprehensive error handling for `get_diff()` function. Now properly catches and reports errors when git is not installed or when git commands fail (e.g., not in a git repository).
-- **Provider API Key Handling**: Improved API key resolution for providers that don't require authentication. Providers now explicitly declare whether they require API keys via `requires_api_key` attribute, preventing unnecessary API key errors for services like local Ollama instances or API-key-free compatible endpoints.
+- **Provider API Key Handling**: Significantly improved API key handling to properly support providers with different authentication requirements:
+  - Providers now explicitly declare if they require API keys via `requires_api_key` attribute
+  - Added `api_key_env_var` hints for better error messages (e.g., "Set OPENAI_API_KEY environment variable")
+  - OpenAI-compatible provider now detects authentication failures at runtime and provides helpful error messages
+  - Fixed security issue: No longer sends dummy API keys (like "nokey") to third-party APIs - passes `None` instead and lets the service handle it
+  - Supports local/unauthenticated services (LocalAI, local vLLM, local Ollama) without requiring dummy keys
+  - Clear distinction between: mandatory keys (OpenAI, Groq, Google), optional keys (Ollama), and service-dependent keys (OpenAI-compatible)
 - **Context Size Calculation**: Fixed Ollama context size calculation to use a dedicated helper function with documented algorithm. Context size is now automatically calculated when `num_ctx` is not provided or set to `None/0`.
 - **Type Hints Modernization**: Updated all type hints to use modern Python 3.10+ syntax (`str | None` instead of `Optional[str]`, `dict[str, str]` instead of `Dict[str, str]`), improving consistency and readability.
 - **Dead Code Removal**: Removed commented-out code blocks in `clue_parser()` and other functions, improving code cleanliness.
