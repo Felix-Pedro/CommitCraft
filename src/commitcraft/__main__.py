@@ -28,6 +28,11 @@ from commitcraft import (
     get_diff,
 )
 
+# Default patterns to ignore in diffs (lock files add noise without useful context)
+DEFAULT_IGNORE_PATTERNS = [
+    "*.lock",
+]
+
 from .config_handler import interactive_config
 
 # Define a custom theme that uses standard ANSI colors to respect the user's terminal theme configuration
@@ -621,22 +626,19 @@ def main(
 
         # Get the git diff
         diff = get_diff()
+
+        # Build ignore patterns: defaults + .commitcraft/.ignore + CLI --ignore
+        ignored_patterns = list(DEFAULT_IGNORE_PATTERNS)
         if os.path.exists("./.commitcraft/.ignore"):
             with open("./.commitcraft/.ignore") as ignore_file:
-                ignored_patterns = list(
-                    set([pattern.strip() for pattern in ignore_file.readlines()])
+                ignored_patterns.extend(
+                    [pattern.strip() for pattern in ignore_file.readlines() if pattern.strip()]
                 )
-            if ignore:
-                ignored_patterns = list(
-                    set(
-                        [pattern.strip() for pattern in ignore.split(",")]
-                        + ignored_patterns
-                    )
-                )
-            diff = filter_diff(diff, ignored_patterns)
-
-        elif ignore:
-            diff = filter_diff(diff, [pattern.strip() for pattern in ignore.split(",")])
+        if ignore:
+            ignored_patterns.extend(
+                [pattern.strip() for pattern in ignore.split(",")]
+            )
+        diff = filter_diff(diff, list(set(ignored_patterns)))
 
         # Determine if the context file is provided or try to load the default
         # print(str(config_file))
