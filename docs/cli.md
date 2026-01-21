@@ -24,6 +24,7 @@ CommitCraft [OPTIONS] [COMMAND]
 | `--config-file` | | Path to a custom config file (`.toml`, `.yaml`, `.json`). | Checks `.commitcraft/` folder |
 | `--ignore` | | Comma-separated list of file patterns to exclude from the diff. | Checks `.commitcraft/.ignore` with default patterns |
 | `--debug-prompt` | | Print the generated prompt without sending it to the LLM. | `False` |
+| `--amend` | | Generate message for `git commit --amend`. | `False` |
 
 ### Model Configuration
 
