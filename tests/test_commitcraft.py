@@ -4,7 +4,7 @@ import pytest
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from commitcraft.CommitCraft import get_diff
+from commitcraft.CommitCraft import get_diff, filter_diff, matches_pattern
 
 
 class TestGetDiff:
@@ -44,3 +44,64 @@ class TestGetDiff:
 
         with pytest.raises(RuntimeError, match="Git command failed"):
             get_diff()
+
+
+class TestDiffFiltering:
+    """Tests for diff filtering and pattern matching."""
+
+    def test_matches_pattern_simple(self):
+        """Test simple pattern matching."""
+        assert matches_pattern("file.lock", ["*.lock"])
+        assert matches_pattern("package-lock.json", ["package-lock.json"])
+        assert not matches_pattern("file.txt", ["*.lock"])
+
+    def test_matches_pattern_multiple(self):
+        """Test matching against multiple patterns."""
+        patterns = ["*.lock", "*.min.js", "*.map"]
+        assert matches_pattern("app.min.js", patterns)
+        assert matches_pattern("style.map", patterns)
+        assert not matches_pattern("app.js", patterns)
+
+    def test_filter_diff_excludes_matched_files(self):
+        """Test that matched files are excluded from diff."""
+        diff = """diff --git a/src/app.js b/src/app.js
++console.log('hello');
+diff --git a/package-lock.json b/package-lock.json
++{
++  "lockfileVersion": 3
++}
+diff --git a/src/utils.js b/src/utils.js
++export function utils() {}
+"""
+        filtered = filter_diff(diff, ["package-lock.json"])
+        assert "app.js" in filtered
+        assert "utils.js" in filtered
+        assert "package-lock.json" not in filtered
+        assert "lockfileVersion" not in filtered
+
+    def test_filter_diff_all_files_filtered(self):
+        """Test filtering when all files match ignore patterns."""
+        diff = """diff --git a/package-lock.json b/package-lock.json
++{
++  "lockfileVersion": 3
++}
+diff --git a/yarn.lock b/yarn.lock
++# yarn lockfile
+"""
+        filtered = filter_diff(diff, ["*.lock", "package-lock.json"])
+        # Should be empty or only whitespace
+        assert not filtered.strip()
+
+    def test_filter_diff_glob_patterns(self):
+        """Test filtering with glob patterns."""
+        diff = """diff --git a/src/app.js b/src/app.js
++code
+diff --git a/dist/app.min.js b/dist/app.min.js
++minified
+diff --git a/src/test.js b/src/test.js
++test
+"""
+        filtered = filter_diff(diff, ["*.min.js"])
+        assert "src/app.js" in filtered
+        assert "src/test.js" in filtered
+        assert "app.min.js" not in filtered

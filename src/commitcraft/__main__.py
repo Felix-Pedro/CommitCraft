@@ -647,13 +647,23 @@ def main(
         if os.path.exists("./.commitcraft/.ignore"):
             with open("./.commitcraft/.ignore") as ignore_file:
                 ignored_patterns.extend(
-                    [pattern.strip() for pattern in ignore_file.readlines() if pattern.strip()]
+                    [
+                        pattern.strip()
+                        for pattern in ignore_file.readlines()
+                        if pattern.strip()
+                    ]
                 )
         if ignore:
-            ignored_patterns.extend(
-                [pattern.strip() for pattern in ignore.split(",")]
-            )
+            ignored_patterns.extend([pattern.strip() for pattern in ignore.split(",")])
         diff = filter_diff(diff, list(set(ignored_patterns)))
+
+        # Validate that there are changes to commit
+        if not diff or not diff.strip():
+            err_console.print(
+                "[yellow]No staged changes to analyze.[/yellow]\n"
+                "Either there are no staged changes, or all files are ignored by the filter patterns."
+            )
+            raise typer.Exit(0)
 
         # Determine if the context file is provided or try to load the default
         # print(str(config_file))
@@ -818,9 +828,7 @@ def config(
 
         # Check if file already exists
         if os.path.exists(ignore_file):
-            console.print(
-                f"[yellow]⚠ {ignore_file} already exists.[/yellow]"
-            )
+            console.print(f"[yellow]⚠ {ignore_file} already exists.[/yellow]")
             overwrite = typer.confirm("Overwrite?", default=False)
             if not overwrite:
                 console.print("[dim]Aborted.[/dim]")
@@ -856,9 +864,7 @@ pnpm-lock.yaml
         with open(ignore_file, "w") as f:
             f.write(content)
 
-        console.print(
-            f"[green]✓ Created {ignore_file} with default patterns.[/green]"
-        )
+        console.print(f"[green]✓ Created {ignore_file} with default patterns.[/green]")
         console.print("[dim]Edit the file to customize which files to ignore.[/dim]")
         return
 
