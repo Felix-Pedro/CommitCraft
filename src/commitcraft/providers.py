@@ -49,6 +49,9 @@ class LLMProvider(ABC):
     # Subclasses should set this to True if API key is mandatory
     requires_api_key: bool = False
 
+    # Subclasses can set this to specify the environment variable name for API key
+    api_key_env_var: str | None = None
+
     def __init__(
         self,
         model: str,
@@ -72,9 +75,14 @@ class LLMProvider(ABC):
 
         # Validate API key requirement
         if self.requires_api_key and not self.api_key:
+            env_hint = (
+                f" Set {self.api_key_env_var} environment variable"
+                if self.api_key_env_var
+                else ""
+            )
             raise APIKeyMissingError(
-                f"{self.__class__.__name__} requires an API key. "
-                f"Please set it via environment variable or configuration."
+                f"{self.__class__.__name__} requires an API key.{env_hint} "
+                f"or provide it in your configuration file."
             )
 
     @abstractmethod
@@ -189,6 +197,7 @@ class OllamaCloudProvider(LLMProvider):
     """
 
     requires_api_key = True
+    api_key_env_var = "OLLAMA_API_KEY"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Ollama Cloud's chat API."""
@@ -228,6 +237,7 @@ class GroqProvider(LLMProvider):
     """Provider for Groq's high-performance LLM API."""
 
     requires_api_key = True
+    api_key_env_var = "GROQ_API_KEY"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Groq's chat completions API."""
@@ -258,6 +268,7 @@ class GoogleProvider(LLMProvider):
     """Provider for Google's Gemini models."""
 
     requires_api_key = True
+    api_key_env_var = "GOOGLE_API_KEY"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Google's Gemini API."""
@@ -295,6 +306,7 @@ class OpenAIProvider(LLMProvider):
     """Provider for OpenAI's GPT models."""
 
     requires_api_key = True
+    api_key_env_var = "OPENAI_API_KEY"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using OpenAI's chat completions API."""
@@ -330,10 +342,16 @@ class OpenAICompatibleProvider(LLMProvider):
     - LiteLLM
     - LocalAI
     - vLLM
+    - Ollama (when accessed via OpenAI-compatible endpoint)
     - Any other service implementing OpenAI's API
+
+    Note: Some compatible APIs don't require authentication. If your service
+    requires an API key, set CUSTOM_API_KEY environment variable or provide
+    it in your configuration.
     """
 
     requires_api_key = False  # Some compatible APIs don't require keys
+    api_key_env_var = "CUSTOM_API_KEY"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using OpenAI-compatible API."""
@@ -342,11 +360,23 @@ class OpenAICompatibleProvider(LLMProvider):
         # API key may or may not be required depending on the service
         api_key = self.api_key or os.getenv("CUSTOM_API_KEY")
 
-        # If no API key is provided, let the client handle it (may work for some services)
-        client = OpenAI(
-            api_key=api_key if api_key else "none",  # Some services accept any value
-            base_url=str(self.host),
-        )
+        # Try to create client - let it fail naturally if API key is required but missing
+        # Don't use a dummy key as that could leak information to third-party APIs
+        try:
+            client = OpenAI(
+                api_key=api_key,  # None is acceptable for some services
+                base_url=str(self.host),
+            )
+        except Exception as e:
+            # If client creation fails due to missing API key, provide helpful message
+            if "api_key" in str(e).lower():
+                raise APIKeyMissingError(
+                    f"The OpenAI-compatible service at {self.host} requires an API key. "
+                    f"Set CUSTOM_API_KEY environment variable or provide api_key in configuration."
+                ) from e
+            raise LLMProviderError(
+                f"Failed to initialize OpenAI-compatible client: {e}"
+            ) from e
 
         # Filter to supported options
         filtered_options = self._filter_options(OPENAI_COMPATIBLE_OPTIONS)
@@ -363,6 +393,17 @@ class OpenAICompatibleProvider(LLMProvider):
             )
             return response.choices[0].message.content
         except Exception as e:
+            # Check if the error is authentication-related
+            error_str = str(e).lower()
+            if any(
+                keyword in error_str
+                for keyword in ["unauthorized", "401", "api key", "authentication"]
+            ):
+                raise APIKeyMissingError(
+                    f"Authentication failed for {self.host}. "
+                    f"The service requires an API key. Set CUSTOM_API_KEY environment variable "
+                    f"or provide api_key in your configuration."
+                ) from e
             raise LLMProviderError(f"OpenAI-compatible generation failed: {e}") from e
 
 
