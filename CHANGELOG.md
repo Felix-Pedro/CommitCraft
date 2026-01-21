@@ -7,9 +7,14 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [unreleased]
 
+### Changed
+
+- **Package Manager Migration**: Migrated from Poetry to uv for faster dependency management and simpler tooling. Development commands now use `uv sync` and `uv run` instead of `poetry install` and `poetry run`. Both `uv tool install` and `pipx install` are supported for end-user installation.
+- **All Providers by Default**: The default installation now includes all providers (Ollama, OpenAI, Groq, Google) out of the box.
+
 ### Added
 
-- **Loading Bits**: Added a few more loading phrases to entratain while generate the message
+- **Loading Bits**: Added a few more loading phrases to entertain while generating the message
 - **Hook Skip Option**: Added `COMMITCRAFT_SKIP=1` environment variable to skip CommitCraft for a single commit. Use `COMMITCRAFT_SKIP=1 git commit` to bypass the hook temporarily.
 - **Unhook Command**: Added `CommitCraft unhook` command as a more discoverable alias for `CommitCraft hook --uninstall`. Supports `--global` / `-g` flag to remove global hooks.
 - **Auto-Skip on `-m` Flag**: Hook now automatically skips when using `git commit -m "message"` since the user has already provided their own commit message.

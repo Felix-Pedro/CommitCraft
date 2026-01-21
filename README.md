@@ -18,30 +18,17 @@ CommitCraft is a tool designed to enhance your commit messages by leveraging Lar
 
 ## Installation
 
-You can install CommitCraft using `pipx` for a hassle-free experience:
+You can install CommitCraft using `uv` (recommended) or `pipx`:
 
 ```bash
+# Using uv (recommended)
+uv tool install commitcraft
+
+# Using pipx
 pipx install commitcraft
 ```
-Note : the default instalations is ollama only.
 
-If you intent to use some provider other than ollama consider using one of the following:
-
-```bash
-pipx install 'commitcraft[openai]'
-```
-
-```bash
-pipx install 'commitcraft[groq]'
-```
-
-```bash
-pipx install 'commitcraft[google]'
-```
-
-```bash
-pipx install 'commitcraft[all-providers]'
-```
+The installation includes all supported providers (Ollama, OpenAI, Groq, and Google).
 
 ## Quick Start
 
@@ -368,9 +355,13 @@ However, if you are not self-hosting your models, it's important to be aware of 
 
 If for some reason a dependency is missing follow these steps:
 
-1. Run the following command 
+1. Run the following command
 
 ```sh
+# If installed with uv
+uv tool install commitcraft --with [dependency_name]
+
+# If installed with pipx
 pipx inject commitcraft [dependency_name]
 ```
 
