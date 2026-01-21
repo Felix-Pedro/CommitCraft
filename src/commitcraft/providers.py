@@ -207,6 +207,10 @@ class OllamaProvider(LLMProvider):
         """
         combined_text = system_prompt + user_prompt
 
+        # Get bounds from options or fall back to module-level constants
+        min_ctx_val = self.options.get("min_ctx") or MIN_CONTEXT_SIZE
+        max_ctx_val = self.options.get("max_ctx") or MAX_CONTEXT_SIZE
+
         # Method 1: Try tiktoken if available (recommended for accuracy)
         try:
             import tiktoken
@@ -222,7 +226,7 @@ class OllamaProvider(LLMProvider):
             # while not over-allocating memory
             estimated = int(token_count * 1.6)
 
-            return min(max(estimated, MIN_CONTEXT_SIZE), MAX_CONTEXT_SIZE)
+            return min(max(estimated, min_ctx_val), max_ctx_val)
 
         except ImportError:
             # tiktoken not installed - use character-based fallback
@@ -237,7 +241,7 @@ class OllamaProvider(LLMProvider):
         input_len = len(combined_text)
         estimated_tokens = int(input_len * CONTEXT_CHAR_TO_TOKEN_RATIO)
 
-        return min(max(estimated_tokens, MIN_CONTEXT_SIZE), MAX_CONTEXT_SIZE)
+        return min(max(estimated_tokens, min_ctx_val), max_ctx_val)
 
 
 class OllamaCloudProvider(LLMProvider):

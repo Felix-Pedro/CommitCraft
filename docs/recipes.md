@@ -104,9 +104,10 @@ git commit
 > [d] Documentation
 > [r] Refactoring
 > [n] None
+> [s] Skip (write message manually)
 > Your choice: f
 
-> Describe the feature (optional):
+> Describe feature (optional):
 > Added dark mode toggle
 
 # CommitCraft runs with: --feat-desc "Added dark mode toggle"
@@ -171,13 +172,21 @@ system_prompt = "You are a pirate software engineer. Write commit messages in a 
 
 ## Advanced Git Hook Workflows
 
-### Bypassing the Hook
+### Skipping the Hook
 Sometimes you just want to write a quick message without AI assistance.
 
 ```bash
-git commit -m "update readme" --no-verify
-# OR simply provide a message, the hook usually respects pre-existing messages
-git commit -m "quick fix"
+# Option 1: Skip hook using environment variable
+COMMITCRAFT_SKIP=1 git commit
+
+# Option 2: Auto-skip when providing your own message
+git commit -m "quick fix"  # Hook automatically skips
+
+# Option 3: Use interactive menu and choose to skip
+git commit
+# > What type of commit is this?
+# > [s] Skip (write message manually)
+# Your choice: s
 ```
 
 ### Chaining with `pre-commit`
