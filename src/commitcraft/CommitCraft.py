@@ -7,7 +7,6 @@ prompt construction, and LLM interactions through various providers.
 """
 
 import fnmatch
-import os
 import subprocess
 from enum import Enum
 from typing import Literal
@@ -317,7 +316,8 @@ def commit_craft(
     context: dict[str, str] | None = None,
     emoji: EmojiConfig | None = None,
     debug_prompt: bool = False,
-) -> str:
+    dry_run: bool = False,
+) -> str | dict:
     """
     Generate a commit message using an LLM based on staged git changes.
 
@@ -331,9 +331,10 @@ def commit_craft(
         context: Optional project context (name, language, description, guidelines)
         emoji: Optional emoji configuration for GitMoji support
         debug_prompt: If True, return the prompt instead of calling the LLM
+        dry_run: If True, return token usage statistics without generating a message
 
     Returns:
-        Generated commit message string
+        Generated commit message string, or dictionary of usage stats if dry_run=True
 
     Raises:
         LLMProviderError: If the provider fails to generate a response
@@ -374,6 +375,10 @@ def commit_craft(
             host=str(models.host) if models.host else None,
             options=model_options,
         )
+
+        if dry_run:
+            return provider.calculate_usage(system_prompt, user_prompt)
+
         return provider.generate(system_prompt, user_prompt)
     except LLMProviderError as e:
         raise RuntimeError(f"Failed to generate commit message: {e}") from e

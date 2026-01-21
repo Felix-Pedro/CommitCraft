@@ -27,6 +27,7 @@ from commitcraft import (
     filter_diff,
     get_diff,
 )
+from .config_handler import interactive_config
 
 # Default patterns to ignore in diffs (these files add noise without useful context)
 DEFAULT_IGNORE_PATTERNS = [
@@ -48,7 +49,6 @@ DEFAULT_IGNORE_PATTERNS = [
     "*.svg",
 ]
 
-from .config_handler import interactive_config
 
 # Define a custom theme that uses standard ANSI colors to respect the user's terminal theme configuration
 custom_theme = Theme(
@@ -647,6 +647,14 @@ def main(
             rich_help_panel="Default Context", help="Your Project Commit Guidelines"
         ),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            rich_help_panel="Model Config",
+            is_flag=True,
+            help="Calculate token usage without generating a message",
+        ),
+    ] = False,
 ):
     """
     [bold green]Generates a commit message[/bold green] based on the result of [cyan]git diff --staged -M[/cyan] and your clues, via the LLM you choose.
@@ -770,7 +778,9 @@ def main(
         )
 
         cli_options = lmodel_options.model_dump()
-        config_options = model_config.options.model_dump() if model_config.options else {}
+        config_options = (
+            model_config.options.model_dump() if model_config.options else {}
+        )
         model_options = {
             config: cli_options.get(config)
             if cli_options.get(config, False)
@@ -802,6 +812,27 @@ def main(
             refact=refact_desc if refact_desc else refact,
             custom_clue=context_clue if context_clue else False,
         )
+
+        if dry_run:
+            response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt, dry_run=True)
+            
+            if no_color or plain:
+                import json
+                print(json.dumps(response, indent=2))
+            else:
+                from rich.table import Table
+                
+                table = Table(title="CommitCraft Dry Run")
+                table.add_column("Metric", style="cyan")
+                table.add_column("Value", style="green")
+                
+                for key, value in response.items():
+                    key_fmt = key.replace("_", " ").title()
+                    table.add_row(key_fmt, str(value))
+                
+                console.print(table)
+            
+            return
 
         # Call the commit_craft function with rotating loading messages
         response = rotating_status(

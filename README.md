@@ -188,6 +188,7 @@ Give the AI more context about your changes:
 **Note:** If you're using the git hook in interactive mode (default), you'll be prompted for these clues automatically. Use these CLI flags when running CommitCraft manually.
 
 #### Other Options
+- `--amend`: Generate message for `git commit --amend`
 - `--ignore`: Files or patterns to exclude from the diff (comma-separated)
 - `--debug-prompt`: Display the prompt without sending it to the LLM (useful for debugging)
 - `--no-color` / `-p` / `--plain`: Disable colored output (for piping or scripting)
