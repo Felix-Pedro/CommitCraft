@@ -603,3 +603,45 @@ def interactive_config():
             print(f"[green]API keys process finished for {env_path}[/green]")
     else:
         print("[yellow]No API keys to save.[/yellow]")
+
+    # Ignore File
+    print("\n[blue][Ignore Patterns][/blue]")
+    ignore_file = base_dir / ".ignore"
+
+    if ignore_file.exists():
+        print(f"[dim]{ignore_file} already exists.[/dim]")
+    else:
+        if typer.confirm(
+            "Generate .ignore file with default patterns? (lock files, minified assets, etc.)",
+            default=True,
+        ):
+            content = """# CommitCraft ignore patterns
+# Files matching these patterns will be excluded from the diff sent to the LLM
+# Uses fnmatch syntax (*, ?, [seq], [!seq])
+
+# Lock files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Minified/bundled assets
+*.min.js
+*.min.css
+*.map
+
+# Auto-generated files
+*.snap
+*.pb.go
+*.pb.js
+*_generated.*
+*.d.ts
+
+# Vector graphics (often large/generated)
+*.svg
+
+# Add your custom patterns below:
+"""
+            with open(ignore_file, "w") as f:
+                f.write(content)
+            print(f"[green]✓ Created {ignore_file}[/green]")
+            print("[dim]Edit the file to customize which files to ignore.[/dim]")
