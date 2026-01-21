@@ -32,11 +32,16 @@ class MissingHostError(ValueError):
         super().__init__(self.message)
 
 
-def get_diff() -> str:
+def get_diff(amend: bool = False) -> str:
     """
     Retrieve the staged changes in the git repository.
 
     Executes 'git diff --staged -M' to get staged changes with move detection.
+    If amend is True, it retrieves the changes that would be committed by 'git commit --amend',
+    comparing the current index against HEAD's parent (or empty tree if HEAD is root).
+
+    Args:
+        amend: If True, generate diff for amending the last commit.
 
     Returns:
         The diff output as a string
@@ -45,8 +50,35 @@ def get_diff() -> str:
         RuntimeError: If git command fails or git is not installed
     """
     try:
+        if amend:
+            # Check if HEAD exists
+            try:
+                subprocess.run(
+                    ["git", "rev-parse", "--verify", "HEAD"],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                raise RuntimeError("Cannot amend: No HEAD commit found.")
+
+            # Try to get HEAD^ (parent)
+            try:
+                subprocess.run(
+                    ["git", "rev-parse", "--verify", "HEAD^"],
+                    check=True,
+                    capture_output=True,
+                )
+                # HEAD has a parent, diff against it
+                cmd = ["git", "diff", "--cached", "HEAD^", "-M"]
+            except subprocess.CalledProcessError:
+                # HEAD is root commit, diff against empty tree
+                empty_tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+                cmd = ["git", "diff", "--cached", empty_tree, "-M"]
+        else:
+            cmd = ["git", "diff", "--staged", "-M"]
+
         result = subprocess.run(
-            ["git", "diff", "--staged", "-M"],
+            cmd,
             capture_output=True,
             text=True,
             check=True,
@@ -267,7 +299,7 @@ def clue_parser(input: CommitCraftInput) -> dict[str, str | bool]:
         Dictionary of parsed clues ready for template rendering
     """
     clues_and_input = {}
-    for key, value in input.dict().items():
+    for key, value in input.model_dump().items():
         if value is True:
             # Boolean flag - use default description
             clues_and_input[key] = default.get(key, key)
@@ -334,7 +366,7 @@ def commit_craft(
 
     # Get provider instance and generate response
     try:
-        model_options = models.options.dict() if models.options else {}
+        model_options = models.options.model_dump() if models.options else {}
         provider = get_provider(
             provider_name=models.provider.value,
             model=models.model or "qwen3",  # Fallback to default model

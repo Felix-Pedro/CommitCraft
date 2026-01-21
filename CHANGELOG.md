@@ -15,6 +15,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ### Added
 
+- **Amend Mode**: Added `--amend` flag to generate commit messages for `git commit --amend`. It intelligently calculates the diff by comparing the current index against the parent of HEAD (or the empty tree if amending a root commit).
 - **Default Ignore Patterns**: Lock files, minified assets, source maps, and other noisy files are now ignored by default when generating commit messages. Default patterns include `*.lock`, `package-lock.json`, `pnpm-lock.yaml`, `*.min.js`, `*.min.css`, `*.map`, `*.snap`, `*.pb.go`, `*.pb.js`, `*_generated.*`, `*.d.ts`, and `*.svg`.
 - **Generate Ignore File**: Added `CommitCraft config --generate-ignore` (or `-i`) to quickly create a `.commitcraft/.ignore` file with default patterns for customization. The interactive config wizard also prompts to generate this file.
 - **Loading Bits**: Added a few more loading phrases to entertain while generating the message
@@ -26,6 +27,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- **Pydantic v2 Compatibility**: Updated `model_dump()` and `ConfigDict` usage to address deprecation warnings when running with Pydantic v2.
 - **Git Error Handling**: Added comprehensive error handling for `get_diff()` function. Now properly catches and reports errors when git is not installed or when git commands fail (e.g., not in a git repository).
 - **Provider API Key Handling**: Significantly improved API key handling to properly support providers with different authentication requirements:
   - Providers now explicitly declare if they require API keys via `requires_api_key` attribute
