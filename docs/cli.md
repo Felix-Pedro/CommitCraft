@@ -22,7 +22,7 @@ CommitCraft [OPTIONS] [COMMAND]
 | `--version` | `-v` | Show the current version and exit. | |
 | `--no-color` | `-p` | Disable colored output (useful for piping/scripts). | `False` |
 | `--config-file` | | Path to a custom config file (`.toml`, `.yaml`, `.json`). | Checks `.commitcraft/` folder |
-| `--ignore` | | Comma-separated list of file patterns to exclude from the diff. | Checks `.commitcraft/.ignore` |
+| `--ignore` | | Comma-separated list of file patterns to exclude from the diff. | Checks `.commitcraft/.ignore` with default patterns |
 | `--debug-prompt` | | Print the generated prompt without sending it to the LLM. | `False` |
 
 ### Model Configuration
@@ -35,6 +35,9 @@ Control which AI model generates your message.
 | `--model` | `COMMITCRAFT_MODEL` | Specific model name (e.g., `llama3`, `gpt-4`). | Provider dependent (see table below) |
 | `--system-prompt` | `COMMITCRAFT_SYSTEM_PROMPT` | Override the default system prompt. | |
 | `--temperature` | `COMMITCRAFT_TEMPERATURE` | Creativity level (0.0 - 1.0). | Config dependent |
+| `--top-p` | `COMMITCRAFT_TOP_P` | Nucleus sampling probability (0.0 - 1.0). | Config dependent |
+| `--min-ctx` | `COMMITCRAFT_MIN_CONTEXT_SIZE` | Minimum context size for auto-calculation. | `1024` |
+| `--max-ctx` | `COMMITCRAFT_MAX_CONTEXT_SIZE` | Maximum context size for auto-calculation. | `128000` |
 | `--num-ctx` | `COMMITCRAFT_NUM_CTX` | Context window size (token limit). Ollama only. | Auto-calculated for Ollama |
 | `--max-tokens` | `COMMITCRAFT_MAX_TOKENS` | Maximum number of tokens to generate. | Config dependent |
 | `--host` | `COMMITCRAFT_HOST` | API host URL (required for `openai_compatible`, optional for `ollama`). | `http://localhost:11434` (Ollama) |
@@ -163,6 +166,50 @@ When installed, running `git commit` will automatically generate a message and p
 | `--uninstall` | `-u` | Remove the CommitCraft hook from the current (or global) repository. |
 | `--no-interactive` | | Disable the interactive prompts during commit. |
 
+#### Skipping the Hook
+
+You can skip the CommitCraft hook in several ways:
+
+**1. Environment Variable:**
+```bash
+COMMITCRAFT_SKIP=1 git commit
+```
+
+**2. Interactive Menu:**
+When using interactive mode, choose `[s] Skip (write message manually)` from the menu.
+
+**3. Auto-Skip on `-m` Flag:**
+The hook automatically skips when you provide your own message:
+```bash
+git commit -m "Your custom message"
+```
+
+**4. Uninstall:**
+```bash
+# Remove local hook
+CommitCraft unhook
+# Or: CommitCraft hook --uninstall
+
+# Remove global hook
+CommitCraft unhook --global
+```
+
+---
+
+### `unhook`
+
+Convenient alias for removing CommitCraft hooks. This command is equivalent to `CommitCraft hook --uninstall`.
+
+```bash
+CommitCraft unhook [OPTIONS]
+```
+
+#### Options
+
+| Option | Short | Description |
+| :--- | :--- | :--- |
+| `--global` | `-g` | Remove the **global** git hook template (instead of local). |
+
 !!! example "Workflow"
     1. Run `CommitCraft hook` in your repo.
     2. Stage files: `git add .`
@@ -196,14 +243,49 @@ This method is especially useful for one-off commits where specific model behavi
 Launches an interactive wizard to create configuration files.
 
 ```bash
-CommitCraft config
+CommitCraft config [OPTIONS]
 ```
+
+#### Options
+
+| Option | Short | Description |
+| :--- | :--- | :--- |
+| `--generate-ignore` | `-i` | Generate a `.commitcraft/.ignore` file with default patterns. |
 
 This wizard helps you set up:
 *   **Providers:** Configure API keys and endpoints for Ollama, OpenAI, etc.
 *   **Models:** Select your preferred default model.
 *   **Context:** Define project description and guidelines.
 *   **Emojis:** Choose your preferred emoji style (gitmoji, simple, etc.).
+*   **Ignore Patterns:** Automatically create an ignore file with default patterns for lock files, minified assets, and generated code.
+
+#### Default Ignore Patterns
+
+When you generate an ignore file, it includes these default patterns:
+
+```bash
+# Lock files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Minified/bundled assets
+*.min.js
+*.min.css
+*.map
+
+# Auto-generated files
+*.snap
+*.pb.go
+*.pb.js
+*_generated.*
+*.d.ts
+
+# Vector graphics (often large/generated)
+*.svg
+```
+
+You can edit the generated `.commitcraft/.ignore` file to add or remove patterns as needed.
 
 ### `init`
 

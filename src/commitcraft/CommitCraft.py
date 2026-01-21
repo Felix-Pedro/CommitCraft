@@ -133,6 +133,9 @@ class LModelOptions(BaseModel):
     num_ctx: int | None = None
     temperature: float | None = None
     max_tokens: int | None = None
+    top_p: float | None = None
+    min_ctx: int | None = None
+    max_ctx: int | None = None
 
     @field_validator("max_tokens")
     @classmethod

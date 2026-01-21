@@ -14,11 +14,10 @@ pip install commitcraft[all-providers]
 ## Quick Start
 
 ```python
-from commitcraft import commit_craft, CommitCraftInput, LModel
+from commitcraft import commit_craft, CommitCraftInput, LModel, get_diff
 
 # Get your git diff
-import subprocess
-diff = subprocess.run(["git", "diff", "--staged", "-M"], capture_output=True, text=True).stdout
+diff = get_diff()
 
 # Create input
 input_data = CommitCraftInput(diff=diff)
@@ -283,6 +282,9 @@ Options for model inference.
 | :--- | :--- | :--- | :--- |
 | `num_ctx` | `int \| None` | Auto-calculated (Ollama) | Context window size |
 | `temperature` | `float \| None` | Provider default | Sampling temperature (0.0-1.0) |
+| `top_p` | `float \| None` | Provider default | Nucleus sampling probability |
+| `min_ctx` | `int \| None` | `1024` | Minimum context size |
+| `max_ctx` | `int \| None` | `128000` | Maximum context size |
 | `max_tokens` | `int \| None` | Provider default | Maximum output tokens |
 | Extra fields allowed | Any | | Provider-specific options |
 
@@ -400,6 +402,81 @@ except MissingHostError as e:
 
 ---
 
+## Advanced Features
+
+### Default Ignore Patterns
+
+CommitCraft automatically excludes certain file types from diff analysis to focus on meaningful changes. Default patterns include:
+
+```python
+# Built-in default patterns
+DEFAULT_IGNORE_PATTERNS = [
+    # Lock files
+    "*.lock",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    # Minified/bundled assets
+    "*.min.js",
+    "*.min.css",
+    "*.map",
+    # Auto-generated files
+    "*.snap",
+    "*.pb.go",
+    "*.pb.js",
+    "*_generated.*",
+    "*.d.ts",
+    # Vector graphics (often large/generated)
+    "*.svg",
+]
+```
+
+You can customize these by creating a `.commitcraft/.ignore` file or using the `--ignore` flag.
+
+### Generating Ignore Files
+
+Use the interactive config wizard to generate an ignore file:
+
+```bash
+# Generate .commitcraft/.ignore with default patterns
+CommitCraft config --generate-ignore
+```
+
+Or generate it manually in your scripts:
+
+```python
+from pathlib import Path
+
+ignore_content = """# CommitCraft ignore patterns
+# Files matching these patterns will be excluded from the diff sent to the LLM
+
+# Lock files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Minified/bundled assets
+*.min.js
+*.min.css
+*.map
+
+# Auto-generated files
+*.snap
+*.pb.go
+*.pb.js
+*_generated.*
+*.d.ts
+
+# Vector graphics (often large/generated)
+*.svg
+"""
+
+ignore_file = Path(".commitcraft") / ".ignore"
+ignore_file.parent.mkdir(exist_ok=True)
+ignore_file.write_text(ignore_content)
+```
+
+---
+
 ## Complete Example: Custom Automation Script
 
 ```python
@@ -498,6 +575,47 @@ def generate_message(diff: str) -> str:
     model: LModel = LModel(provider="ollama", model="qwen3")
     message: str = commit_craft(input=input_data, models=model)
     return message
+```
+
+---
+
+## Hook Integration
+
+CommitCraft integrates with git hooks via the `prepare-commit-msg` hook. When installed, the hook automatically generates commit messages.
+
+### Environment Variables
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `COMMITCRAFT_SKIP` | Skip CommitCraft hook for a single commit | `COMMITCRAFT_SKIP=1 git commit` |
+
+### Hook Behavior
+
+The hook automatically skips when:
+- User provides their own message with `git commit -m "message"`
+- `COMMITCRAFT_SKIP` environment variable is set to `1`
+- User selects `[s] Skip` option in interactive mode
+
+### Installing/Uninstalling Hooks
+
+To manage hooks, use the CLI commands directly:
+
+```bash
+# Install local hook (interactive)
+CommitCraft hook
+
+# Install local hook (non-interactive)
+CommitCraft hook --no-interactive
+
+# Install global hook
+CommitCraft hook --global
+
+# Uninstall local hook
+CommitCraft unhook
+# Or: CommitCraft hook --uninstall
+
+# Uninstall global hook
+CommitCraft unhook --global
 ```
 
 ---

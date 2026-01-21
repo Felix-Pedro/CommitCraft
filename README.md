@@ -9,11 +9,13 @@ CommitCraft is a tool designed to enhance your commit messages by leveraging Lar
 - **Interactive Configuration**: User-friendly wizard (`CommitCraft config`) to set up providers, models, and preferences.
 - **Hierarchical Configuration**: Global configuration for user-wide defaults, project-specific overrides, and CLI arguments.
 - **CommitClues**: Provide context clues (bug fixes, features, docs, refactoring) to help the AI generate more accurate messages.
-- **Configurable Context Size**: Automatically adjusts the context size for optimal performance. (Ollama only)
+- **Intelligent Context Size**: Automatically adjusts Ollama context size using accurate token counting (via `tiktoken`) for optimal performance and memory usage.
 - **Emoji Support**: Option to include emojis in your commit messages based on predefined conventions. Pre-configured with gitmoji specification.
-- **Ignore Files**: Exclude specific files from diff analysis using patterns (like .gitignore).
+- **Smart Ignore Patterns**: Default ignore patterns for lock files, minified assets, and generated code - automatically excludes noise from diff analysis.
+- **Generate Ignore File**: Quick command (`CommitCraft config --generate-ignore`) to create a customizable `.commitcraft/.ignore` file.
 - **User-Friendly CLI**: A command-line interface with colorful help messages and easy-to-use options.
 - **Debug Mode**: Inspect prompts before sending to the LLM with `--debug-prompt`.
+- **Hook Control**: Skip hooks temporarily with `COMMITCRAFT_SKIP=1`, interactive skip option, or automatic skip when using `-m` flag.
 - **Customizable**: Allows to easily setup a personalized system prompt and contextual information for tuning your results to your project commit guidelines.
 
 ## Installation
@@ -28,7 +30,9 @@ uv tool install commitcraft
 pipx install commitcraft
 ```
 
-The installation includes all supported providers (Ollama, OpenAI, Groq, and Google).
+The installation includes all supported providers (Ollama, OpenAI, Groq, and Google) and the `tiktoken` library for accurate context size calculation.
+
+**Note:** CommitCraft has migrated from Poetry to `uv` for dependency management. Development now uses `uv sync` and `uv run` commands.
 
 ## Quick Start
 
@@ -60,8 +64,12 @@ CommitCraft hook --global
 # Install in non-interactive mode (no prompts)
 CommitCraft hook --no-interactive
 
-# Remove the hook
-CommitCraft hook --uninstall
+# Remove the hook (local)
+CommitCraft unhook
+# Or equivalently: CommitCraft hook --uninstall
+
+# Remove global hook
+CommitCraft unhook --global
 ```
 
 #### Hook Modes
@@ -70,6 +78,7 @@ CommitCraft hook --uninstall
 When you run `git commit`, the hook will prompt you:
 1. **Commit type**: Bug fix, Feature, Documentation, Refactoring, or None
 2. **Optional description**: Provide additional context for better commit messages
+3. **Skip option**: Choose to skip AI generation and write the message manually
 
 This allows you to use **CommitClues** directly within the hook workflow!
 
@@ -92,6 +101,19 @@ git commit
 
 **Non-Interactive Mode:**
 Generates messages automatically without prompts. Useful for automated workflows or if you prefer always editing the message manually.
+
+**Skipping the Hook:**
+
+You can skip the CommitCraft hook in several ways:
+
+1. **Environment Variable**: Set `COMMITCRAFT_SKIP=1` before committing:
+   ```bash
+   COMMITCRAFT_SKIP=1 git commit
+   ```
+
+2. **Interactive Mode**: Choose `[s] Skip (write message manually)` from the interactive menu
+
+3. **Auto-Skip on `-m` Flag**: The hook automatically skips when you provide your own message with `git commit -m "your message"`
 
 Once installed, the hook will automatically generate a commit message whenever you run `git commit`. The AI-generated message will be pre-filled in your editor for you to review and edit before finalizing.
 
@@ -222,18 +244,34 @@ max_tokens = 800
 
 #### Ignore Files
 
-You can exclude files from the diff analysis by creating a `.commitcraft/.ignore` file with patterns (similar to `.gitignore`):
+CommitCraft now includes **default ignore patterns** to automatically exclude noisy files from commit message analysis. Default patterns include:
+- Lock files: `*.lock`, `package-lock.json`, `pnpm-lock.yaml`
+- Minified assets: `*.min.js`, `*.min.css`, `*.map`
+- Auto-generated files: `*.snap`, `*.pb.go`, `*.pb.js`, `*_generated.*`, `*.d.ts`
+- Vector graphics: `*.svg`
+
+You can customize these patterns by creating a `.commitcraft/.ignore` file:
 
 ```
 # .commitcraft/.ignore
 *.lock
 package-lock.json
-poetry.lock
 dist/*
 *.min.js
 ```
 
-Or use the `--ignore` flag:
+**Quickly generate an ignore file:**
+```bash
+# Using the interactive config wizard
+CommitCraft config --generate-ignore
+
+# Or the short form
+CommitCraft config -i
+```
+
+This creates `.commitcraft/.ignore` with default patterns that you can customize.
+
+Or use the `--ignore` flag for one-time exclusions:
 ```bash
 CommitCraft --ignore "*.lock,dist/*"
 ```
@@ -257,6 +295,17 @@ GOOGLE_API_KEY=your-google-api-key
 
 # Custom OpenAI-compatible providers (if not using named profiles)
 CUSTOM_API_KEY=your-custom-api-key
+
+# Advanced Configuration (Optional)
+# Override automatic context size calculation limits
+COMMITCRAFT_MIN_CONTEXT_SIZE=1024
+COMMITCRAFT_MAX_CONTEXT_SIZE=128000
+```
+
+**Hook Control:**
+```sh
+# Skip CommitCraft hook for a single commit
+COMMITCRAFT_SKIP=1 git commit
 ```
 
 **Named Provider Profiles:**

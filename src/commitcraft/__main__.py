@@ -477,7 +477,7 @@ def main(
             rich_help_panel="Model Config",
             envvar="COMMITCRAFT_MODEL",
             help="Model name (e.g., [cyan]gemma2[/cyan], [cyan]llama3.1:70b[/cyan])",
-            show_default="ollama: [cyan]qwen3[/cyan], ollama_cloud: [cyan]qwen3-coder:480b-cloud[/cyan], groq: [cyan]qwen/qwen3-32b[/cyan], google: [cyan]gemini-2.5-pro[/cyan], openai: [cyan]gpt-3.5-turbo[/cyan]",
+            show_default="ollama: [cyan]qwen3[/cyan], ollama_cloud: [cyan]qwen3-coder:480b-cloud[/cyan], groq: [cyan]qwen/qwen3-32b[/cyan], google: [cyan]gemini-2.5-flash[/cyan], openai: [cyan]gpt-3.5-turbo[/cyan]",
         ),
     ] = None,
     system_prompt: Annotated[
@@ -496,12 +496,36 @@ def main(
             help="Context size for the model",
         ),
     ] = None,
+    min_ctx: Annotated[
+        Optional[int],
+        typer.Option(
+            rich_help_panel="Model Config",
+            envvar="COMMITCRAFT_MIN_CONTEXT_SIZE",
+            help="Minimum context size (for auto-calculation)",
+        ),
+    ] = None,
+    max_ctx: Annotated[
+        Optional[int],
+        typer.Option(
+            rich_help_panel="Model Config",
+            envvar="COMMITCRAFT_MAX_CONTEXT_SIZE",
+            help="Maximum context size (for auto-calculation)",
+        ),
+    ] = None,
     temperature: Annotated[
         Optional[float],
         typer.Option(
             rich_help_panel="Model Config",
             envvar="COMMITCRAFT_TEMPERATURE",
             help="Temperature for the model",
+        ),
+    ] = None,
+    top_p: Annotated[
+        Optional[float],
+        typer.Option(
+            rich_help_panel="Model Config",
+            envvar="COMMITCRAFT_TOP_P",
+            help="Top-p sampling for the model",
         ),
     ] = None,
     max_tokens: Annotated[
@@ -625,8 +649,11 @@ def main(
     • [cyan]OPENAI_API_KEY[/cyan]
     • [cyan]GROQ_API_KEY[/cyan]
     • [cyan]GOOGLE_API_KEY[/cyan]
+    • [cyan]OLLAMA_API_KEY[/cyan] (for [magenta]ollama_cloud[/magenta] or remote instances)
     • [cyan]CUSTOM_API_KEY[/cyan] (for [magenta]openai_compatible[/magenta] provider)
-    • [cyan]OLLAMA_HOST[/cyan] (for [magenta]ollama[/magenta] provider, e.g., [dim]http://localhost:11434[/dim]; this can also be set directly in the configuration file).
+    • [cyan]NICKNAME_API_KEY[/cyan] (for named provider profiles, e.g., [dim]REMOTE_API_KEY[/dim])
+    • [cyan]OLLAMA_HOST[/cyan] (for [magenta]ollama[/magenta] provider, e.g., [dim]http://localhost:11434[/dim])
+    • [cyan]COMMITCRAFT_MIN_CONTEXT_SIZE[/cyan] / [cyan]COMMITCRAFT_MAX_CONTEXT_SIZE[/cyan] (for context limits)
     """
     if ctx.invoked_subcommand is None:
         # Handle color output
@@ -726,8 +753,11 @@ def main(
         # Construct the model options
         lmodel_options = LModelOptions(
             num_ctx=num_ctx if num_ctx else None,
+            min_ctx=min_ctx if min_ctx else None,
+            max_ctx=max_ctx if max_ctx else None,
             temperature=temperature if temperature else None,
             max_tokens=max_tokens if max_tokens else None,
+            top_p=top_p if top_p else None,
             # **extra_model_options  # Merge extra model options here
         )
 

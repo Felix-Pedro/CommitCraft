@@ -493,6 +493,9 @@ CommitCraft supports environment variables for all configuration options. This i
 | `COMMITCRAFT_MODEL` | `--model` | Model name | `qwen3`, `gpt-4` |
 | `COMMITCRAFT_SYSTEM_PROMPT` | `--system-prompt` | Custom system prompt | `"You are..."` |
 | `COMMITCRAFT_TEMPERATURE` | `--temperature` | Model temperature | `0.7` |
+| `COMMITCRAFT_TOP_P` | `--top-p` | Nucleus sampling probability | `0.9` |
+| `COMMITCRAFT_MIN_CONTEXT_SIZE` | `--min-ctx` | Minimum context size for Ollama | `1024` |
+| `COMMITCRAFT_MAX_CONTEXT_SIZE` | `--max-ctx` | Maximum context size for Ollama | `128000` |
 | `COMMITCRAFT_NUM_CTX` | `--num-ctx` | Context window (Ollama) | `8192` |
 | `COMMITCRAFT_MAX_TOKENS` | `--max-tokens` | Max output tokens | `500` |
 | `COMMITCRAFT_HOST` | `--host` | API host URL | `http://localhost:11434` |
@@ -808,3 +811,102 @@ When you run CommitCraft:
 5. Sends the filtered diff to the AI
 
 This means ignored files won't influence the generated commit message at all.
+
+---
+
+## Default Ignore Patterns
+
+CommitCraft includes built-in default ignore patterns to automatically exclude noisy files from diff analysis. These patterns are applied automatically when generating commit messages, helping the AI focus on meaningful changes.
+
+### Default Patterns
+
+```bash
+# Lock files
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Minified/bundled assets
+*.min.js
+*.min.css
+*.map
+
+# Auto-generated files
+*.snap
+*.pb.go
+*.pb.js
+*_generated.*
+*.d.ts
+
+# Vector graphics (often large/generated)
+*.svg
+```
+
+### How Default Patterns Work
+
+1. **Built-in Filtering**: These patterns are automatically applied by default when CommitCraft processes your git diff
+2. **Customizable**: You can override or extend default patterns by creating your own `.commitcraft/.ignore` file
+3. **Pattern Precedence**: Patterns in `.commitcraft/.ignore` take precedence over default patterns
+
+### Generate Custom Ignore File
+
+You can quickly generate a customizable ignore file with default patterns:
+
+```bash
+# Generate .commitcraft/.ignore with default patterns
+CommitCraft config --generate-ignore
+
+# Or using short form
+CommitCraft config -i
+```
+
+This creates `.commitcraft/.ignore` in your project with all default patterns pre-populated. You can then edit the file to add project-specific patterns or remove defaults you want to include.
+
+### Customizing Patterns
+
+Edit `.commitcraft/.ignore` to add your project-specific patterns:
+
+```
+# Default patterns (auto-included)
+*.lock
+package-lock.json
+*.min.js
+# ... (other defaults)
+
+# Your custom additions
+database/schema.sql
+temp/*
+cache/
+*.log
+```
+
+### Disable Default Patterns
+
+To disable all default patterns, create a `.commitcraft/.ignore` file and add the pattern that explicitly includes everything:
+
+```
+# Disable default ignore patterns
+```
+
+Or override with `--ignore=""` CLI flag:
+
+```bash
+CommitCraft --ignore=""
+```
+
+### Why These Patterns?
+
+- **Lock files**: Dependency lock files change frequently but rarely require meaningful commit messages
+- **Minified assets**: Minified JS/CSS files are generated during build and don't provide useful context
+- **Source maps**: `.map` files are large and generated for debugging
+- **Protocol buffers**: Generated `.pb.go` and `.pb.js` files are output from schema definitions
+- **Generated code**: Files ending with `_generated.*` or `.d.ts` are auto-generated from other sources
+- **SVG files**: Often large, generated, or asset files that don't need commit message context
+
+### Best Practices
+
+1. **Keep defaults**: The default patterns work well for most projects
+2. **Add project-specific patterns**: Extend with patterns for your specific codebase
+3. **Test after changes**: After modifying ignore patterns, test with `CommitCraft --debug-prompt` to verify what's being filtered
+4. **Share with team**: Commit `.commitcraft/.ignore` to ensure consistent message generation across team members
+5. **Review periodically**: As your project evolves, review and update ignore patterns to match new file types

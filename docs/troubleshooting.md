@@ -26,6 +26,7 @@ Common issues and solutions for CommitCraft.
 1. Check your environment variables (`printenv | grep API_KEY`).
 2. Ensure you have a `.env` file in the directory where you run CommitCraft.
 3. If using a named provider profile, ensure the variable matches the pattern `NICKNAME_API_KEY`.
+4. Check if the provider actually requires an API key (Ollama local doesn't, but OpenAI/Groq/Google do).
 
 ### Git Hook Not Triggering
 **Issue:** You run `git commit` but CommitCraft doesn't start.
@@ -213,3 +214,8 @@ Yes! Use the `openai_compatible` provider. You can point it to any endpoint (LM 
 ### Does it send my code to the cloud?
 *   **Ollama (Local):** No. Everything runs on your machine.
 *   **Commercial Providers (OpenAI, Groq, etc.):** Yes, the diff is sent to their API. Check their privacy policies.
+
+### How is context size calculated for Ollama?
+CommitCraft uses the `tiktoken` library (using the `cl100k_base` encoding) to accurately count tokens in your prompt and diff. This ensures the model's context window is efficiently utilized without overflow. 
+
+If `tiktoken` is not available or fails, CommitCraft falls back to a character-to-token ratio estimation (approx. 2.64 chars/token). You can override the calculated size using `--num-ctx` or by setting `COMMITCRAFT_MIN_CONTEXT_SIZE` / `COMMITCRAFT_MAX_CONTEXT_SIZE` environment variables.
