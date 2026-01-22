@@ -100,11 +100,12 @@ def apply_cli_overrides(
     }
 
     # Merge with existing options
-    base_options = base_model.options.dict() if base_model.options else {}
-    merged_options = {
-        key: cli_options[key] if cli_options[key] is not None else base_options.get(key)
-        for key in set(list(cli_options.keys()) + list(base_options.keys()))
-    }
+    base_options = base_model.options.model_dump() if base_model.options else {}
+    merged_options = base_options.copy()
+
+    for key, value in cli_options.items():
+        if value is not None:
+            merged_options[key] = value
 
     # Build new LModel with overrides
     return LModel(
@@ -152,9 +153,16 @@ def resolve_model_configuration(
     # Step 1: Resolve base configuration (named provider or standard provider)
     base_model = resolve_provider_config(provider, config)
 
+    # Check if the provider arg was used to resolve a named profile
+    # If so, we should NOT use it as a provider type override
+    providers_map = config.get("providers", {})
+    provider_override = provider
+    if provider and provider in providers_map:
+        provider_override = None
+
     # Step 2: Apply CLI overrides
     cli_args = {
-        "provider": provider,
+        "provider": provider_override,
         "model": model,
         "system_prompt": system_prompt,
         "host": host,

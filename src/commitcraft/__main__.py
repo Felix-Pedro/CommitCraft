@@ -466,6 +466,14 @@ def main(
             help="Calculate token usage without generating a message",
         ),
     ] = False,
+    confirm: Annotated[
+        bool,
+        typer.Option(
+            envvar="COMMITCRAFT_CONFIRM",
+            is_flag=True,
+            help="Enable two-step confirmation: show dry-run info and settings, then ask for confirmation before generating",
+        ),
+    ] = False,
 ):
     """
     [bold green]Generates a commit message[/bold green] based on the result of [cyan]git diff --staged -M[/cyan] and your clues, via the LLM you choose.
@@ -628,7 +636,7 @@ def main(
             custom_clue=context_clue if context_clue else False,
         )
 
-        if dry_run:
+        if dry_run or confirm:
             response = commit_craft(
                 input,
                 model_config,
@@ -645,7 +653,11 @@ def main(
             else:
                 from rich.table import Table
 
-                table = Table(title="CommitCraft Dry Run")
+                table = Table(
+                    title="CommitCraft Dry Run"
+                    if dry_run
+                    else "CommitCraft Configuration Preview"
+                )
                 table.add_column("Metric", style="cyan")
                 table.add_column("Value", style="green")
 
@@ -655,7 +667,33 @@ def main(
 
                 console.print(table)
 
-            return
+            # If only dry_run (not confirm), exit here
+            if dry_run and not confirm:
+                return
+
+            # If confirm mode, ask for user confirmation
+            if confirm:
+                if no_color or plain:
+                    # Plain text confirmation
+                    import sys
+
+                    print(
+                        "\nProceed with commit message generation? (y/n): ",
+                        end="",
+                        file=sys.stderr,
+                    )
+                    sys.stderr.flush()
+                    response_input = input().strip().lower()
+                    if response_input not in ("y", "yes"):
+                        err_console.print("Cancelled by user.")
+                        raise typer.Exit(0)
+                else:
+                    # Rich confirmation
+                    if not typer.confirm(
+                        "\nProceed with commit message generation?", default=True
+                    ):
+                        err_console.print("[yellow]Cancelled by user.[/yellow]")
+                        raise typer.Exit(0)
 
         # Call the commit_craft function with rotating loading messages
         response = rotating_status(
@@ -791,6 +829,14 @@ def hook(
             help="Disable interactive prompts for CommitClues in the hook",
         ),
     ] = False,
+    confirm: Annotated[
+        bool,
+        typer.Option(
+            "--confirm",
+            is_flag=True,
+            help="Enable two-step confirmation in the hook: show dry-run info before generating",
+        ),
+    ] = False,
 ):
     """
     [bold cyan]Set up CommitCraft as a git commit hook.[/bold cyan]
@@ -811,10 +857,10 @@ def hook(
     if uninstall:
         _uninstall_hook(global_hook)
     else:
-        _install_hook(global_hook, interactive=not no_interactive)
+        _install_hook(global_hook, interactive=not no_interactive, confirm=confirm)
 
 
-def _install_hook(global_hook: bool, interactive: bool = True):
+def _install_hook(global_hook: bool, interactive: bool = True, confirm: bool = False):
     """Install the CommitCraft git hook."""
     import subprocess
     from pathlib import Path
@@ -890,6 +936,8 @@ def _install_hook(global_hook: bool, interactive: bool = True):
     is_global_install = global_hook
     hook_location = "global" if is_global_install else "local"
     hook_mode = "interactive" if interactive else "non-interactive"
+    if confirm:
+        hook_mode += " + confirm"
 
     # Build the update command based on mode and location
     update_flags = ""
@@ -897,12 +945,20 @@ def _install_hook(global_hook: bool, interactive: bool = True):
         update_flags += " --global"
     if not interactive:
         update_flags += " --no-interactive"
+    if confirm:
+        update_flags += " --confirm"
 
     update_command = f"CommitCraft hook{update_flags}"
 
+    # Base CommitCraft command (never include --confirm here, as confirmation is handled by the hook itself)
+    commitcraft_base_cmd = "CommitCraft"
+
+    # Track if confirmation was requested during installation
+    hook_has_confirm = "1" if confirm else ""
+
     # Create the hook script based on interactive mode
     if interactive:
-        hook_script = f'''#!/bin/sh
+        hook_script = rf'''#!/bin/sh
 # CommitCraft Git Hook (Interactive Mode)
 # Automatically generates commit messages using AI with optional CommitClues
 # Hook Version: {package_version}
@@ -914,7 +970,7 @@ COMMIT_SOURCE=$2
 
 # Check hook version
 HOOK_VERSION="{package_version}"
-INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
+INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" || echo "unknown")
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
     printf "\033[1;33m⚠️  CommitCraft hook is outdated\033[0m \033[2m(hook: \033[1;31m%s\033[0m\033[2m, installed: \033[1;32m%s\033[0m\033[2m)\033[0m\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
@@ -1007,7 +1063,52 @@ if [ -z "$COMMIT_SOURCE" ]; then
             ;;
     esac
 
-    # Generate commit message with CommitCraft
+    # Check if confirmation mode is enabled (via hook --confirm or COMMITCRAFT_CONFIRM env var)
+    ENABLE_CONFIRMATION=""
+    if [ -n "$COMMITCRAFT_CONFIRM" ]; then
+        ENABLE_CONFIRMATION="1"
+    fi
+    # Check if hook was installed with --confirm
+    case "{commitcraft_base_cmd}" in
+        *--confirm*)
+            ENABLE_CONFIRMATION="1"
+            ;;
+    esac
+
+    # If confirmation is enabled, show dry-run first and ask for confirmation
+    if [ -n "$ENABLE_CONFIRMATION" ]; then
+        # Unset COMMITCRAFT_CONFIRM to prevent CLI from showing its own confirmation
+        unset COMMITCRAFT_CONFIRM
+        
+        echo "" >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        echo "  Dry-Run Preview (Confirmation Mode)" >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        
+        # Run dry-run to show token usage
+        if [ -n "$COMMITCRAFT_DESC" ]; then
+            CommitCraft --dry-run $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC" >&2
+        elif [ -n "$COMMITCRAFT_ARGS" ]; then
+            CommitCraft --dry-run $COMMITCRAFT_ARGS >&2
+        else
+            CommitCraft --dry-run >&2
+        fi
+        
+        echo "" >&2
+        printf "Proceed with commit message generation? (Y/n): " >&2
+        read -r CONFIRM_RESPONSE
+        
+        case "$CONFIRM_RESPONSE" in
+            [Nn]|[Nn][Oo])
+                echo "Cancelled by user." >&2
+                exit 1
+                ;;
+        esac
+        echo "" >&2
+    fi
+
+    # Generate commit message with CommitCraft (without --confirm flag)
+    
     # Pass description as a separate argument to avoid quoting issues
     if [ -n "$COMMITCRAFT_DESC" ]; then
         GENERATED_MSG=$(CommitCraft $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC")
@@ -1028,7 +1129,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
 fi
 '''
     else:
-        hook_script = f'''#!/bin/sh
+        hook_script = rf'''#!/bin/sh
 # CommitCraft Git Hook (Non-Interactive Mode)
 # Automatically generates commit messages using AI
 # Hook Version: {package_version}
@@ -1040,7 +1141,7 @@ COMMIT_SOURCE=$2
 
 # Check hook version
 HOOK_VERSION="{package_version}"
-INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
+INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" || echo "unknown")
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
     printf "\033[1;33m⚠️  CommitCraft hook is outdated\033[0m \033[2m(hook: \033[1;31m%s\033[0m\033[2m, installed: \033[1;32m%s\033[0m\033[2m)\033[0m\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
@@ -1066,7 +1167,43 @@ if [ -z "$COMMIT_SOURCE" ]; then
         exit 0
     fi
 
-    # Generate commit message with CommitCraft
+    # Check if confirmation mode is enabled (via hook --confirm or COMMITCRAFT_CONFIRM env var)
+    ENABLE_CONFIRMATION="{hook_has_confirm}"
+    if [ -n "$COMMITCRAFT_CONFIRM" ]; then
+        ENABLE_CONFIRMATION="1"
+    fi
+
+    # If confirmation is enabled, show dry-run first and ask for confirmation
+    if [ -n "$ENABLE_CONFIRMATION" ]; then
+        # Redirect input from terminal to make read work in git hook
+        exec < /dev/tty
+        
+        # Unset COMMITCRAFT_CONFIRM to prevent CLI from showing its own confirmation
+        unset COMMITCRAFT_CONFIRM
+        
+        echo "" >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        echo "  Dry-Run Preview (Confirmation Mode)" >&2
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+        
+        # Run dry-run to show token usage
+        CommitCraft --dry-run >&2
+        
+        echo "" >&2
+        printf "Proceed with commit message generation? (Y/n): " >&2
+        read -r CONFIRM_RESPONSE
+        
+        case "$CONFIRM_RESPONSE" in
+            [Nn]|[Nn][Oo])
+                echo "Cancelled by user." >&2
+                exit 1
+                ;;
+        esac
+        echo "" >&2
+    fi
+
+    # Generate commit message with CommitCraft (without --confirm flag)
+    
     # stderr goes to terminal (shows loading spinner), stdout captured
     GENERATED_MSG=$(CommitCraft)
 
@@ -1091,6 +1228,8 @@ fi
     mode_text = (
         "[cyan]interactive[/cyan]" if interactive else "[dim]non-interactive[/dim]"
     )
+    if confirm:
+        mode_text += " [yellow]+ confirm[/yellow]"
 
     if global_hook:
         console.print(
