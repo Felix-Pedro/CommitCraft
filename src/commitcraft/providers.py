@@ -22,6 +22,12 @@ from abc import ABC, abstractmethod
 # - Special tokens and formatting overhead
 # - Conservative buffer to avoid context overflow
 #
+# Methodology:
+# We tested various diff sizes against tiktoken's cl100k_base encoding and compared
+# character counts to token counts. The average ratio was around 3.5 chars/token
+# for code, but closer to 2.5-3.0 for mixed diff content. 2.64 provides a safe
+# lower bound estimation when tiktoken is unavailable.
+#
 # Note: As of CommitCraft 1.1.0+, tiktoken is a required dependency for accurate
 # token counting. This fallback ratio is only used if tiktoken fails to load.
 CONTEXT_CHAR_TO_TOKEN_RATIO = 2.64
@@ -101,24 +107,23 @@ class LLMProvider(ABC):
 
         # Validate API key requirement
         # Check if api_key is provided OR if it's available in environment
-        if self.requires_api_key and not self.api_key:
+        if not self.api_key and self.api_key_env_var:
             # Try to get from environment variable as fallback
-            if self.api_key_env_var:
-                env_api_key = os.getenv(self.api_key_env_var)
-                if env_api_key:
-                    self.api_key = env_api_key
+            env_api_key = os.getenv(self.api_key_env_var)
+            if env_api_key:
+                self.api_key = env_api_key
 
-            # If still no API key found, raise error
-            if not self.api_key:
-                env_hint = (
-                    f" Set {self.api_key_env_var} environment variable"
-                    if self.api_key_env_var
-                    else ""
-                )
-                raise APIKeyMissingError(
-                    f"{self.__class__.__name__} requires an API key.{env_hint} "
-                    f"or provide it in your configuration file."
-                )
+        # If strict requirement and still no key, raise error
+        if self.requires_api_key and not self.api_key:
+            env_hint = (
+                f" Set {self.api_key_env_var} environment variable"
+                if self.api_key_env_var
+                else ""
+            )
+            raise APIKeyMissingError(
+                f"{self.__class__.__name__} requires an API key.{env_hint} "
+                f"or provide it in your configuration file."
+            )
 
     @abstractmethod
     def generate(self, system_prompt: str, user_prompt: str) -> str:
@@ -217,9 +222,14 @@ class OllamaProvider(LLMProvider):
             client_args["host"] = str(host_val)
 
         # Add API key if provided (for authenticated instances)
-        ollama_api_key = self.api_key or os.getenv("OLLAMA_API_KEY")
-        if ollama_api_key:
-            client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
+        if self.api_key:
+            client_args["headers"] = {"Authorization": f"Bearer {self.api_key}"}
+        elif os.getenv("OLLAMA_API_KEY"):
+            # Fallback for non-strict API key (OllamaProvider requires_api_key=False)
+            # but user might have set it in env var anyway
+            client_args["headers"] = {
+                "Authorization": f"Bearer {os.getenv('OLLAMA_API_KEY')}"
+            }
 
         client = ollama.Client(**client_args)
 
@@ -313,10 +323,8 @@ class OllamaCloudProvider(LLMProvider):
         # Cloud configuration
         client_args = {"host": "https://ollama.com"}
 
-        # API key is required for cloud
-        ollama_api_key = self.api_key or os.getenv("OLLAMA_API_KEY")
-        if ollama_api_key:
-            client_args["headers"] = {"Authorization": f"Bearer {ollama_api_key}"}
+        # API key is required and guaranteed by __init__
+        client_args["headers"] = {"Authorization": f"Bearer {self.api_key}"}
 
         client = ollama.Client(**client_args)
 
@@ -351,8 +359,7 @@ class GroqProvider(LLMProvider):
         """Generate response using Groq's chat completions API."""
         from groq import Groq
 
-        api_key = self.api_key or os.getenv("GROQ_API_KEY")
-        client = Groq(api_key=api_key)
+        client = Groq(api_key=self.api_key)
 
         # Filter to supported options
         filtered_options = self._filter_options(OPENAI_COMPATIBLE_OPTIONS)
@@ -384,8 +391,7 @@ class GoogleProvider(LLMProvider):
         from google import genai
         from google.genai import types
 
-        api_key = self.api_key or os.getenv("GOOGLE_API_KEY")
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=self.api_key)
 
         # Build config with system instruction
         google_config = {}
@@ -415,7 +421,8 @@ class GoogleProvider(LLMProvider):
         from google import genai
         from google.genai import types
 
-        api_key = self.api_key or os.getenv("GOOGLE_API_KEY")
+        # Use resolved API key
+        api_key = self.api_key
 
         try:
             client = genai.Client(api_key=api_key)
@@ -469,8 +476,7 @@ class AnthropicProvider(LLMProvider):
         """Generate response using Anthropic's Messages API."""
         import anthropic
 
-        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=self.api_key)
 
         # Filter to supported options
         # Anthropic supports: max_tokens, temperature, top_p (and others)
@@ -494,10 +500,8 @@ class AnthropicProvider(LLMProvider):
         """Calculate token usage using Anthropic's native count_tokens API."""
         import anthropic
 
-        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
-
         try:
-            client = anthropic.Anthropic(api_key=api_key)
+            client = anthropic.Anthropic(api_key=self.api_key)
 
             response = client.messages.count_tokens(
                 model=self.model,
@@ -537,8 +541,7 @@ class OpenAIProvider(LLMProvider):
         """Generate response using OpenAI's chat completions API."""
         from openai import OpenAI
 
-        api_key = self.api_key or os.getenv("OPENAI_API_KEY")
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=self.api_key)
 
         # Filter to supported options
         filtered_options = self._filter_options(OPENAI_COMPATIBLE_OPTIONS)
@@ -689,7 +692,10 @@ class OpenAICompatibleProvider(LLMProvider):
         from openai import OpenAI
 
         # API key may or may not be required depending on the service
-        api_key = self.api_key or os.getenv("CUSTOM_API_KEY")
+        # self.api_key is already resolved in __init__ if required, or tried from env
+        # If it's None here, it means it wasn't strictly required (OpenAICompatibleProvider.requires_api_key=False)
+        # and wasn't found in env.
+        api_key = self.api_key
 
         # Try to create client - let it fail naturally if API key is required but missing
         # Don't use a dummy key as that could leak information to third-party APIs

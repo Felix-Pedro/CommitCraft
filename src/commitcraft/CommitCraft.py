@@ -17,6 +17,12 @@ from pydantic import BaseModel, Extra, HttpUrl, field_validator, model_validator
 from .defaults import default
 from .providers import LLMProviderError, get_provider
 
+# The empty tree hash is a well-known git constant that represents an empty directory tree.
+# It is used to generate a diff against "nothing" (e.g., for the initial commit or
+# when diffing against a parentless HEAD during amend).
+# This hash (4b825dc642cb6eb9a060e54bf8d69288fbee4904) is consistent across all git repositories.
+GIT_EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
 
 # Custom exceptions to be raised when using openai_compatible provider.
 class MissingModelError(ValueError):
@@ -71,8 +77,7 @@ def get_diff(amend: bool = False) -> str:
                 cmd = ["git", "diff", "--cached", "HEAD^", "-M"]
             except subprocess.CalledProcessError:
                 # HEAD is root commit, diff against empty tree
-                empty_tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-                cmd = ["git", "diff", "--cached", empty_tree, "-M"]
+                cmd = ["git", "diff", "--cached", GIT_EMPTY_TREE_HASH, "-M"]
         else:
             cmd = ["git", "diff", "--staged", "-M"]
 
@@ -174,6 +179,22 @@ class LModelOptions(BaseModel):
         """Ensure max_tokens is a positive integer if provided."""
         if v is not None and v < 1:
             raise ValueError("max_tokens must be at least 1")
+        return v
+
+    @field_validator("temperature")
+    @classmethod
+    def validate_temperature(cls, v: float | None) -> float | None:
+        """Ensure temperature is non-negative, typically between 0 and 2."""
+        if v is not None and v < 0:
+            raise ValueError("temperature must be non-negative")
+        return v
+
+    @field_validator("top_p")
+    @classmethod
+    def validate_top_p(cls, v: float | None) -> float | None:
+        """Ensure top_p is between 0 and 1."""
+        if v is not None and (v < 0 or v > 1):
+            raise ValueError("top_p must be between 0 and 1")
         return v
 
     class Config:

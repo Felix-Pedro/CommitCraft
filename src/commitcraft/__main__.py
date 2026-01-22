@@ -2,13 +2,13 @@ import os
 import random
 import re
 import threading
+import queue
+from typing import Optional, Any
 
 # Force color support by default (fixes zsh detection issues)
 # Use --no-color flag or NO_COLOR=1 environment variable to disable
 if not os.environ.get("NO_COLOR"):
     os.environ.setdefault("FORCE_COLOR", "1")
-
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
@@ -28,6 +28,7 @@ from commitcraft import (
     get_diff,
 )
 from .config_handler import interactive_config
+from .messages import LOADING_MESSAGES
 
 # Default patterns to ignore in diffs (these files add noise without useful context)
 DEFAULT_IGNORE_PATTERNS = [
@@ -88,218 +89,22 @@ def version_callback(value: bool):
 
 app = typer.Typer(rich_markup_mode="rich")
 
-# Funny loading messages for commit generation
-LOADING_MESSAGES = [
-    "[success]Asking the AI to read your mind...[/success]",
-    "[success]Teaching the model about good commit messages...[/success]",
-    "[success]Generating commit message... (No, it's not skynet... yet)[/success]",
-    "[success]Consulting the neural oracle...[/success]",
-    "[success]Translating diff to human...[/success]",
-    "[success]Running git blame on the AI...[/success]",
-    "[success]Convincing the LLM this isn't just 'fixed stuff'...[/success]",
-    "[success]Teaching robots to write poetry (sort of)...[/success]",
-    "[success]Generating commit message... (99 bugs in the code...)[/success]",
-    "[success]Asking GPT what you actually changed...[/success]",
-    "[success]Warming up the silicon brain cells...[/success]",
-    "[success]Turning your diff into Shakespeare...[/success]",
-    "[success]Making the commit message sound professional...[/success]",
-    "[success]Avoiding 'WIP', 'fix', and 'asdf'...[/success]",
-    "[success]Calculating the meaning of your code changes...[/success]",
-    "[success]Training AI to understand programmer humor...[/success]",
-    "[success]Beep boop... generating human-readable text...[/success]",
-    "[success]Channeling the spirit of Linus Torvalds...[/success]",
-    "[success]Hoping this commit makes sense...[/success]",
-    "[success]Crafting the perfect commit (no pressure)...[/success]",
-    "[success]Predicting the next word...[/success]",
-    "[success]Calculating the probability of next word being 42...[/success]",
-    "[success]Calculating the probability of the next word, It’s 'WIP'. It is statistically always 'WIP'...[/success]",
-    "[success]Calculating the probability of the next word, 99% chance of 'fixed', 1% chance of actually explaining what was fixed...[/success]",
-    "[success]Detecting 14 removed console.log statements. Generating 'cleanup' synonym...[/success]",
-    "[success]Calculating the probability of the next word, result unclear. I recommend git push --force and hoping for the best...[/success]",
-    "[success]Calculating the probability of the next word. ERROR: Probability of breaking production on a Friday is too high...[/success]",
-    "[success]Calculating the probability of next word. Probability of 'minor changes' is high. Probability that the changes are actually minor is low...[/success]",
-    "[success]Calculating the probability of next word. Result: 'Fixed typo'. (We both know it was a logic error, but I won't tell)...[/success]",
-    "[success]Analyzing diff... Suggesting: 'I have no idea why this works now'...[/success]",
-    "[success]Probability of you blaming the previous developer... 100%...[/success]",
-    "[success]Hallucinating a reason for this if (true) statement...[/success]",
-    "[success]42...[/success]",
-    "[success]Measuring whitespace with a micrometer... yup, that's an IndentationError...[/success]",
-    "[success]Importing 'meaning' from 'chaos'...[/success]",
-    "[success]Fighting the Borrow Checker to bring you this text...[/success]",
-    "[success]Panicking at 'main.rs'... just kidding, generating text...[/success]",
-    "[success]Refactoring your arrays to start at 1 (Sorry, Python users)...[/success]",
-    "[success]Waiting for JIT compilation... (It's a Julia thing)...[/success]",
-    "[success]Downloading half the internet into node_modules just to write a title...[/success]",
-    "[success]Trying to center the commit message vertically in a div...[/success]",
-    "[success]Translating 'undefined is not a function' into English...[/success]",
-    "[success]Waiting for the CSS to load so this message looks pretty...[/success]",
-    "[success]Generating commit message... (I use Arch btw)...[/success]",
-    "[success]Converting CRLF to LF. We don't do Windows line endings here...[/success]",
-    "[success]Sudo make me a commit message...[/success]",
-    "[success]Buying a $999 dongle to push this commit...[/success]",
-    "[success]Optimizing for 14,000 different Android screen sizes...[/success]",
-    "[success]Waiting for Apple App Store review to approve this sentence...[/success]",
-    "[success]Replacing tabs with spaces. We live in a society...[/success]",
-    "[success]Detecting mixed indentation. Judging you silently...[/success]",
-    "[success]Trying to exit Vim to save the commit...[/success]",
-    "[success]It works on my machine... pushing to see if it breaks yours...[/success]",
-    "[success]Spinning up a Docker container just to print 'Hello'...[/success]",
-    "[success]Analyzing diff... You used tabs? In THIS economy?...[/success]",
-    "[success]Wrapping your diff in an Option<Result<Commit, Error>>...[/success]",
-    "[success]Generating message... It is blazingly fast and memory safe...[/success]",
-    "[success]Calculating commit message... assuming you actually used a virtual environment...[/success]",
-    "[success]Ignoring the CORS error and forcing the commit anyway...[/success]",
-    "[success]Blaming the backend for this logic error...[/success]",
-    "[success]Injecting dependency... result: 'Coffee'...[/success]",
-    "[success]Applying Windows Update 1 of 3,592... please wait...[/success]",
-    "[success]Chmod 777 on your git history (Don't actually do this)...[/success]",
-    "[success]Buying a new cable because the Lightning port changed again...[/success]",
-    "[success]Ask Siri to write the commit. (She doesn't know either)...[/success]",
-    "[success]Emacs is trying to boot its OS to write this line...[/success]",
-    "[success]Pushing to production. Good luck, future self...[/success]",
-    "[success]Calculating the probability of a merge conflict... High...[/success]",
-    "[success]Generating text... FragmentActivity has leaked...[/success]",
-    "[success]Instantiating AbstractCommitMessageFactoryBuilderSingleton... (Java is verbose)...[/success]",
-    "[success]Scanning for memory leaks... found 3, but ignoring them...[/success]",
-    "[success]Searching Stack Overflow to explain what you just wrote...[/success]",
-    "[success] entering 'detached HEAD' state (both in git and emotionally)...[/success]",
-    "[success]Coercing types... '1' + 1 = '11'. Javascript math is hard...[/success]",
-    "[success]Running out of context window... summarizing aggressively...[/success]",
-    "[success]Checking if this code actually runs or if you just got lucky...[/success]",
-    "[success]Updating dependencies... breaking the build in 3... 2... 1...[/success]",
-    "[success]Trying to explain why you changed 50 files in one commit...[/success]",
-    "[success]Deleting comments to make the diff look smaller...[/success]",
-    "[success]Consulting the rubber duck on your desk...[/success]",
-    "[success]Adding more parentheses just to be safe (Lisp style)...[/success]",
-    "[success]Detecting PHP... adding '$' to every variable...[/success]",
-    "[success]Waiting for the localized string to compile...[/success]",
-    "[success]Pretending to read the Terms and Conditions...[/success]",
-    "[success]Ignoring your .gitignore and adding node_modules anyway...[/success]",
-    "[success]Rebasing... hold onto your history...[/success]",
-    "[success]Checking if you actually saved the file before committing...[/success]",
-    "[success]Parsing HTML with Regex... summoning Cthulhu...[/success]",
-    "[success]Waiting for the serverless function to wake up from its nap...[/success]",
-    "[success]Calculating the probability of next word... 50% 'fix', 50% 'please work'...[/success]",
-    "[success]Translating 'quick hack' into 'temporary solution'...[/success]",
-    "[success]Searching for the missing semicolon...[/success]",
-    "[success]Explaining a Monad to the AI... it's confused too...[/success]",
-    "[success]Switching to Light Mode... just kidding, I'm not a monster...[/success]",
-    "[success]Sanitizing inputs... DROP TABLE users; -- ...[/success]",
-    "[success]Deploying to production on Friday at 5pm... bold strategy...[/success]",
-    "[success]Turning 'It works on my machine' into a feature request...[/success]",
-    "[success]Analyzing cyclomatic complexity... score: Spaghetti...[/success]",
-    "[success]Checking AWS bill... shutting down startup...[/success]",
-    "[success]Calculating z-index... 999999 wasn't high enough...[/success]",
-    "[success]Touching code written by 'The Ancient One' (you, 6 months ago)...[/success]",
-    "[success]Resolving dependency tree... found a circular reference to your sanity...[/success]",
-    "[success]Skipping tests... 'CI/CD' stands for 'Cross fingers / Can't Deploy'...[/success]",
-    "[success]Writing Regex... now you have two problems...[/success]",
-    "[success]Dereferencing null pointer... Segmentation fault (core dumped)... just kidding...[/success]",
-    "[success]Lowering AI temperature... the model is getting too creative with the truth...[/success]",
-    "[success]Converting Jira ticket number into human sadness...[/success]",
-    "[success]Generating documentation... (The code is self-documenting, right?)...[/success]",
-    "[success]Calculating probability of next word... 'refactor' (synonym for 'rewrote everything')...[/success]",
-    "[success]Burning GPU credits... your wallet is crying...[/success]",
-    "[success]Waiting for the DNS to propagate... see you in 48 hours...[/success]",
-    "[success]Ignoring the linter warning. It's a style choice, not a bug...[/success]",
-    "[success]Preparing defenses against the code review...[/success]",
-    "[success]Asking the AI to explain the code. Result: 'I don't know either'...[/success]",
-    "[success]Importing pandas as pd... waiting for RAM to spike...[/success]",
-    "[success]Restarting Kernel and Running All Cells... hoping it still works...[/success]",
-    "[success]Replacing NaNs with the mean... statistically questionable, but it runs...[/success]",
-    "[success]Setting random_state=42... reproducibility is my passion...[/success]",
-    "[success]Explaining to the manager that correlation does not imply causation...[/success]",
-    "[success]Converting '2023-01-01' from String to Datetime... again...[/success]",
-    "[success]Debugging a SQL query with 12 JOINS... send help...[/success]",
-    "[success]Running dbt build... grab a coffee, or maybe a 3-course meal...[/success]",
-    "[success]Checking for circular dependencies in the DAG...[/success]",
-    "[success]SELECT * FROM huge_table... listening for the DBA's scream...[/success]",
-    "[success]Materializing view... please don't time out...[/success]",
-    "[success]Fixing the data pipeline... someone changed a column name in upstream...[/success]",
-    '[success]Translating "Business Logic" into a CASE WHEN statement...[/success]',
-    "[success]Training the model... (It's actually just linear regression)...[/success]",
-    "[success]Overfitting the model until accuracy hits 100% on training data...[/success]",
-    "[success]Torturing the data until it confesses... (p-hacking in progress)...[/success]",
-    "[success]Hyperparameter tuning... see you in 3 days...[/success]",
-    "[success]Ignoring the bias variance tradeoff...[/success]",
-    "[success]Calculating the probability of next word... 95% confidence interval...[/success]",
-    "[success]Exporting to CSV so the stakeholder can open it in Excel...[/success]",
-    "[success]Trying to make a Pie Chart look professional (Impossible)...[/success]",
-    '[success]Changing the dashboard color because "blue isn\'t pop enough"...[/success]',
-    "[success]Cleaning data... 80% of the job is complete...[/success]",
-    '[success]Generating insights... Result: "We need better data"...[/success]',
-    "[success]Spinning up a cluster... burning VC money...[/success]",
-    "[success]Moving data from S3 to Redshift... allow me to sing you the song of my people...[/success]",
-    "[success]Spark job is running... OOM error incoming...[/success]",
-    "[success]Downgrading your Big Data pipeline to a single .xlsx file...[/success]",
-    "[success]Ignoring 'SettingWithCopyWarning' and hoping for the best...[/success]",
-    "[success]Converting column 'Age' from Object to Int... found value 'Thirty-two'...[/success]",
-    "[success]Parsing date formats... US or UK? Let's guess...[/success]",
-    "[success]Imputing missing values with '0'. Data scientists hate this one weird trick...[/success]",
-    "[success]Trimming whitespace... why is there a non-breaking space here?...[/success]",
-    "[success]Renaming 'Linear Regression' to 'AI' to impress the investors...[/success]",
-    "[success]One-hot encoding categorical variables... congratulations, you now have 10,000 columns...[/success]",
-    "[success]Calculating feature importance... Spoiler: It's the variable that leaks the target...[/success]",
-    "[success]Installing CUDA drivers... see you in a week...[/success]",
-    "[success]Staring at the loss curve until it goes down...[/success]",
-    "[success]Asking ChatGPT to explain the P-value because I forgot again...[/success]",
-    "[success]Resisting the urge to make a 3D Pie Chart...[/success]",
-    "[success]Reconciling numbers with Google Analytics...[/success]",
-    "[success]Filtering out the outliers... (aka: the data we don't like)...[/success]",
-    "[success]Refreshing the Tableau extract... checking email... grabbing lunch...[/success]",
-    "[success]Explaining why the dashboard is blank...[/success]",
-    "[success]Running 'SELECT *' without a LIMIT. Living dangerously...[/success]",
-    "[success]Waiting for the Airflow DAG to turn green...[/success]",
-    "[success]Debugging a 500-line stored procedure written by a ghost...[/success]",
-    "[success]Partitioning by date... because full table scans are expensive...[/success]",
-    "[success]df.fillna(method='ffill')...[/success]",
-    "[success]SELECT * FROM raw_events...[/success]",
-    "[success]Pip installing tensorflow... resolving dependency hell...[/success]",
-    "[success]Training on the test set...[/success]",
-    "[success]Achieving 99.9% accuracy on the training data...[/success]",
-    "[success]Parsing '02/03/2024'... assumes DD/MM/YYYY as it is the only resenable assumption...[/success]",
-    "[success]Unpivoting Excel headers...[/success]",
-    "[success]Reducing dimensionality via PCA...[/success]",
-    "[success]Executing unconstrained CROSS JOIN...[/success]",
-    "[success]Rebranding OLS as 'AI'...[/success]",
-    "[success]Fixing the YAML indentation...[/success]",
-    "[success]Waiting for the Spark driver...[/success]",
-    "[success]P-hacking until p < 0.05...[/success]",
-    "[success]Casting float to int... losing precision...[/success]",
-    "[success]Running a full table scan on partition key...[/success]",
-    "[success]Joining on string columns...[/success]",
-    "[success]Exporting 10GB dataframe to CSV...[/success]",
-    "[success]Calculating eigenvalues...[/success]",
-    "[success]Deploying Jupyter Notebook to production...[/success]",
-    "[success]Changing random_state until results look good...[/success]",
-    "[success]Imputing with the mean...[/success]",
-    "[success]Waiting for Query Compilation...[/success]",
-    "[success]Resetting index... again...[/success]",
-    "[success]Solving for X... (X is a black box)...[/success]",
-    "[success]Ignoring heteroscedasticity...[/success]",
-    "[success]Converting Parquet to Excel...[/success]",
-    "[success]Looking for the Elbow in K-Means...[/success]",
-    "[success]Applying unverified regex to production data...[/success]",
-    "[success]WIP...[/success]",
-    "[success]asdf...[/success]",
-    "[success]fixed some stuff...[/success]",
-    "[success]solved the problem that caused the shit to happend in the thing before the stuff...[/success]",
-]
-
 
 def rotating_status(callable_func, *args, **kwargs):
     """
     Execute a function with a rotating loading message that changes every 3 seconds.
+    Safely handles threading and exceptions.
     """
-    result = [None]
-    exception = [None]
+    # Use a Queue for thread-safe result/exception passing
+    result_queue: queue.Queue[Any] = queue.Queue()
     finished = threading.Event()
 
     def run_function():
         try:
-            result[0] = callable_func(*args, **kwargs)
+            res = callable_func(*args, **kwargs)
+            result_queue.put(("result", res))
         except Exception as e:
-            exception[0] = e
+            result_queue.put(("exception", e))
         finally:
             finished.set()
 
@@ -327,14 +132,20 @@ def rotating_status(callable_func, *args, **kwargs):
             message_index = (message_index + 1) % len(messages)
             live.update(Spinner("dots", text=messages[message_index], style="success"))
 
-    # Wait for thread to complete
-    thread.join()
+    # Wait for thread to complete with a small timeout to ensure clean join
+    # If the thread is stuck (e.g., network hang), join() might block,
+    # but since it's a daemon thread, the program can exit if main thread finishes.
+    # However, we are in the main thread waiting for result.
+    thread.join(timeout=1.0)
 
-    # Re-raise any exception that occurred
-    if exception[0]:
-        raise exception[0]
-
-    return result[0]
+    if not result_queue.empty():
+        status, value = result_queue.get()
+        if status == "exception":
+            raise value
+        return value
+    else:
+        # This should rarely happen if finished is set, unless thread died silently
+        raise RuntimeError("Thread finished but returned no result")
 
 
 def load_file(filepath):
@@ -851,19 +662,21 @@ def main(
             commit_craft, input, model_config, context_info, emoji_config, debug_prompt
         )
 
-        # Process <think> tags
+        # Process <think> tags (handling multiple occurrences)
         think_pattern = r"<think>(.*?)</think>"
-        think_match = re.search(think_pattern, response, re.DOTALL)
+        thinking_blocks = re.findall(think_pattern, response, re.DOTALL)
 
-        if think_match:
-            thinking_content = think_match.group(1).strip()
-            # Remove the thinking part from the response
+        if thinking_blocks:
+            # Combine all thinking blocks
+            all_thoughts = "\n---\n".join(block.strip() for block in thinking_blocks)
+
+            # Remove all thinking parts from the response
             response = re.sub(think_pattern, "", response, flags=re.DOTALL).strip()
 
             if show_thinking:
                 err_console.print("[thinking_title]Thinking Process:[/thinking_title]")
                 err_console.print(
-                    f"[thinking_content]{thinking_content}[/thinking_content]\n"
+                    f"[thinking_content]{all_thoughts}[/thinking_content]\n"
                 )
 
         typer.echo(response)
@@ -1101,11 +914,11 @@ COMMIT_SOURCE=$2
 
 # Check hook version
 HOOK_VERSION="{package_version}"
-INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
+INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
-    printf "\\033[1;33m⚠️  CommitCraft hook is outdated\\033[0m \\033[2m(hook: \\033[1;31m%s\\033[0m\\033[2m, installed: \\033[1;32m%s\\033[0m\\033[2m)\\033[0m\\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
-    printf "   \\033[1;36mUpdate with:\\033[0m \\033[1;97m{update_command}\\033[0m\\n" >&2
+    printf "\033[1;33m⚠️  CommitCraft hook is outdated\033[0m \033[2m(hook: \033[1;31m%s\033[0m\033[2m, installed: \033[1;32m%s\033[0m\033[2m)\033[0m\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
+    printf "   \033[1;36mUpdate with:\033[0m \033[1;97m{update_command}\033[0m\n" >&2
     echo "" >&2
 fi
 
@@ -1148,7 +961,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
         s|S)
             # User wants to skip and write manually
             exit 0
-            ;;
+            ;; 
         b|B)
             printf "Describe the bug fix (optional): "
             read -r BUG_DESC
@@ -1158,7 +971,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--bug"
             fi
-            ;;
+            ;; 
         f|F)
             printf "Describe the feature (optional): "
             read -r FEAT_DESC
@@ -1168,7 +981,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--feat"
             fi
-            ;;
+            ;; 
         d|D)
             printf "Describe the documentation change (optional): "
             read -r DOCS_DESC
@@ -1178,7 +991,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--docs"
             fi
-            ;;
+            ;; 
         r|R)
             printf "Describe the refactoring (optional): "
             read -r REFACT_DESC
@@ -1188,7 +1001,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--refact"
             fi
-            ;;
+            ;; 
         *)
             # No specific type, use default
             ;;
@@ -1227,11 +1040,11 @@ COMMIT_SOURCE=$2
 
 # Check hook version
 HOOK_VERSION="{package_version}"
-INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
+INSTALLED_VERSION=$(CommitCraft --version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" || echo "unknown")
 
 if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unknown" ]; then
-    printf "\\033[1;33m⚠️  CommitCraft hook is outdated\\033[0m \\033[2m(hook: \\033[1;31m%s\\033[0m\\033[2m, installed: \\033[1;32m%s\\033[0m\\033[2m)\\033[0m\\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
-    printf "   \\033[1;36mUpdate with:\\033[0m \\033[1;97m{update_command}\\033[0m\\n" >&2
+    printf "\033[1;33m⚠️  CommitCraft hook is outdated\033[0m \033[2m(hook: \033[1;31m%s\033[0m\033[2m, installed: \033[1;32m%s\033[0m\033[2m)\033[0m\n" "$HOOK_VERSION" "$INSTALLED_VERSION" >&2
+    printf "   \033[1;36mUpdate with:\033[0m \033[1;97m{update_command}\033[0m\n" >&2
     echo "" >&2
 fi
 
