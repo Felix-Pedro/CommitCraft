@@ -128,12 +128,8 @@ class LLMProvider(ABC):
         """
         combined_text = system_prompt + user_prompt
         token_count = self._count_tokens(combined_text)
-        
-        return {
-            "token_count": token_count,
-            "estimated_cost": "N/A",  # Providers can override this
-            "model": self.model
-        }
+
+        return {"token_count": token_count, "model": self.model}
 
     def _count_tokens(self, text: str) -> int:
         """
@@ -141,6 +137,7 @@ class LLMProvider(ABC):
         """
         try:
             import tiktoken
+
             # Use cl100k_base encoding (standard for modern LLMs)
             encoding = tiktoken.get_encoding("cl100k_base")
             return len(encoding.encode(text))
@@ -213,14 +210,16 @@ class OllamaProvider(LLMProvider):
     def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
         """Calculate token usage and context size for Ollama."""
         usage = super().calculate_usage(system_prompt, user_prompt)
-        
+
         # Calculate context size using the same logic as generate()
         context_size = self._calculate_context_size(system_prompt, user_prompt)
-        
-        usage.update({
-            "context_size": context_size,
-            "context_utilization": f"{(usage['token_count'] / context_size) * 100:.1f}%"
-        })
+
+        usage.update(
+            {
+                "context_size": context_size,
+                "context_utilization": f"{(usage['token_count'] / context_size) * 100:.1f}%",
+            }
+        )
         return usage
 
     def _calculate_context_size(self, system_prompt: str, user_prompt: str) -> int:
@@ -255,7 +254,7 @@ class OllamaProvider(LLMProvider):
         max_ctx_val = self.options.get("max_ctx") or MAX_CONTEXT_SIZE
 
         token_count = self._count_tokens(combined_text)
-        
+
         # Add 60% buffer: 50% for model response + 10% overhead
         estimated = int(token_count * 1.6)
 
@@ -375,6 +374,40 @@ class GoogleProvider(LLMProvider):
         except Exception as e:
             raise LLMProviderError(f"Google generation failed: {e}") from e
 
+    def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
+        """Calculate token usage for Google using native API."""
+        from google import genai
+        from google.genai import types
+
+        api_key = self.api_key or os.getenv("GOOGLE_API_KEY")
+
+        try:
+            client = genai.Client(api_key=api_key)
+
+            # Combine prompts for counting (Gemini usually counts both system and user)
+            # Or better, pass them distinctly if the API supports it in one call,
+            # but count_tokens usually takes 'contents'.
+            # System instruction is part of the config in generation, but for counting,
+            # we should check if it's counted separately.
+            # Per docs: system instructions consume tokens.
+
+            # Construct content similar to generation
+            contents = [user_prompt]
+            config = {}
+            if system_prompt:
+                config["system_instruction"] = system_prompt
+
+            response = client.models.count_tokens(
+                model=self.model,
+                contents=contents,
+                config=types.GenerateContentConfig(**config),
+            )
+
+            return {"token_count": response.total_tokens, "model": self.model}
+        except Exception:
+            # Fallback to tiktoken/heuristic if API fails (e.g. auth error during dry-run)
+            return super().calculate_usage(system_prompt, user_prompt)
+
 
 class OpenAIProvider(LLMProvider):
     """Provider for OpenAI's GPT models."""
@@ -426,6 +459,37 @@ class OpenAICompatibleProvider(LLMProvider):
 
     requires_api_key = False  # Some compatible APIs don't require keys
     api_key_env_var = "CUSTOM_API_KEY"
+
+    def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
+        """Calculate token usage, using Gemini tokenizer if applicable."""
+        # If it's a Gemini model being accessed via OpenAI proxy, try to use native counting
+        if "gemini" in self.model.lower():
+            try:
+                from google import genai
+                from google.genai import types
+
+                # Use GOOGLE_API_KEY for counting even if using CUSTOM_API_KEY for generation
+                google_api_key = os.getenv("GOOGLE_API_KEY")
+                if google_api_key:
+                    client = genai.Client(api_key=google_api_key)
+
+                    contents = [user_prompt]
+                    config = {}
+                    if system_prompt:
+                        config["system_instruction"] = system_prompt
+
+                    response = client.models.count_tokens(
+                        model=self.model,
+                        contents=contents,
+                        config=types.GenerateContentConfig(**config),
+                    )
+
+                    return {"token_count": response.total_tokens, "model": self.model}
+            except Exception:
+                # Fallback to tiktoken if Google SDK fails or key missing
+                pass
+
+        return super().calculate_usage(system_prompt, user_prompt)
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using OpenAI-compatible API."""

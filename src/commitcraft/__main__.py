@@ -814,24 +814,32 @@ def main(
         )
 
         if dry_run:
-            response = commit_craft(input, model_config, context_info, emoji_config, debug_prompt, dry_run=True)
-            
+            response = commit_craft(
+                input,
+                model_config,
+                context_info,
+                emoji_config,
+                debug_prompt,
+                dry_run=True,
+            )
+
             if no_color or plain:
                 import json
+
                 print(json.dumps(response, indent=2))
             else:
                 from rich.table import Table
-                
+
                 table = Table(title="CommitCraft Dry Run")
                 table.add_column("Metric", style="cyan")
                 table.add_column("Value", style="green")
-                
+
                 for key, value in response.items():
                     key_fmt = key.replace("_", " ").title()
                     table.add_row(key_fmt, str(value))
-                
+
                 console.print(table)
-            
+
             return
 
         # Call the commit_craft function with rotating loading messages
