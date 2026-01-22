@@ -153,11 +153,14 @@ class LLMProvider(ABC):
         Returns:
             Dictionary containing token usage information
         """
-        combined_text = system_prompt + user_prompt
-        token_count = self._count_tokens(combined_text)
+        system_tokens = self._count_tokens(system_prompt)
+        user_tokens = self._count_tokens(user_prompt)
+        token_count = system_tokens + user_tokens
 
         result = {
             "token_count": token_count,
+            "system_prompt_tokens": system_tokens,
+            "user_prompt_tokens": user_tokens,
             "model": self.model,
             "provider": self.nickname if self.nickname else self.provider_name,
         }
@@ -419,7 +422,6 @@ class GoogleProvider(LLMProvider):
     def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
         """Calculate token usage for Google using native API."""
         from google import genai
-        from google.genai import types
 
         # Use resolved API key
         api_key = self.api_key
@@ -432,20 +434,26 @@ class GoogleProvider(LLMProvider):
             if not model_name.startswith("models/"):
                 model_name = f"models/{model_name}"
 
-            # Combine prompts for counting (Gemini usually counts both system and user)
-            # system_instruction is not supported in CountTokensConfig, so we add it to contents
-            contents = []
+            # Count system prompt tokens separately
+            system_tokens = 0
             if system_prompt:
-                contents.append(system_prompt)
-            contents.append(user_prompt)
+                system_response = client.models.count_tokens(
+                    model=model_name,
+                    contents=[system_prompt],
+                )
+                system_tokens = system_response.total_tokens or 0
 
-            response = client.models.count_tokens(
+            # Count user prompt tokens separately
+            user_response = client.models.count_tokens(
                 model=model_name,
-                contents=contents,
+                contents=[user_prompt],
             )
+            user_tokens = user_response.total_tokens or 0
 
             result = {
-                "token_count": response.total_tokens,
+                "token_count": system_tokens + user_tokens,
+                "system_prompt_tokens": system_tokens,
+                "user_prompt_tokens": user_tokens,
                 "model": self.model,
                 "provider": self.nickname if self.nickname else self.provider_name,
             }
@@ -503,14 +511,28 @@ class AnthropicProvider(LLMProvider):
         try:
             client = anthropic.Anthropic(api_key=self.api_key)
 
-            response = client.messages.count_tokens(
+            # Count system prompt tokens
+            system_response = client.messages.count_tokens(
                 model=self.model,
                 system=system_prompt,
+                messages=[
+                    {"role": "user", "content": ""}
+                ],  # Empty message to count only system
+            )
+            system_tokens = system_response.input_tokens
+
+            # Count user prompt tokens
+            user_response = client.messages.count_tokens(
+                model=self.model,
+                system="",  # Empty system to count only user message
                 messages=[{"role": "user", "content": user_prompt}],
             )
+            user_tokens = user_response.input_tokens
 
             result = {
-                "token_count": response.input_tokens,
+                "token_count": system_tokens + user_tokens,
+                "system_prompt_tokens": system_tokens,
+                "user_prompt_tokens": user_tokens,
                 "model": self.model,
                 "provider": self.nickname if self.nickname else self.provider_name,
             }
@@ -602,14 +624,26 @@ class OpenAICompatibleProvider(LLMProvider):
                         # Extract the actual model name after the slash
                         model_name = model_name.split("/")[-1]
 
-                    response = client.messages.count_tokens(
+                    # Count system prompt tokens
+                    system_response = client.messages.count_tokens(
                         model=model_name,
                         system=system_prompt,
+                        messages=[{"role": "user", "content": ""}],
+                    )
+                    system_tokens = system_response.input_tokens
+
+                    # Count user prompt tokens
+                    user_response = client.messages.count_tokens(
+                        model=model_name,
+                        system="",
                         messages=[{"role": "user", "content": user_prompt}],
                     )
+                    user_tokens = user_response.input_tokens
 
                     result = {
-                        "token_count": response.input_tokens,
+                        "token_count": system_tokens + user_tokens,
+                        "system_prompt_tokens": system_tokens,
+                        "user_prompt_tokens": user_tokens,
                         "model": self.model,
                         "provider": self.nickname
                         if self.nickname
@@ -634,7 +668,6 @@ class OpenAICompatibleProvider(LLMProvider):
         if "gemini" in self.model.lower():
             try:
                 from google import genai
-                from google.genai import types
 
                 # Use GOOGLE_API_KEY for counting even if using CUSTOM_API_KEY for generation
                 google_api_key = os.getenv("GOOGLE_API_KEY")
@@ -653,18 +686,26 @@ class OpenAICompatibleProvider(LLMProvider):
                     if not model_name.startswith("models/"):
                         model_name = f"models/{model_name}"
 
-                    contents = []
+                    # Count system prompt tokens
+                    system_tokens = 0
                     if system_prompt:
-                        contents.append(system_prompt)
-                    contents.append(user_prompt)
+                        system_response = client.models.count_tokens(
+                            model=model_name,
+                            contents=[system_prompt],
+                        )
+                        system_tokens = system_response.total_tokens or 0
 
-                    response = client.models.count_tokens(
+                    # Count user prompt tokens
+                    user_response = client.models.count_tokens(
                         model=model_name,
-                        contents=contents,
+                        contents=[user_prompt],
                     )
+                    user_tokens = user_response.total_tokens or 0
 
                     result = {
-                        "token_count": response.total_tokens,
+                        "token_count": system_tokens + user_tokens,
+                        "system_prompt_tokens": system_tokens,
+                        "user_prompt_tokens": user_tokens,
                         "model": self.model,
                         "provider": self.nickname
                         if self.nickname
