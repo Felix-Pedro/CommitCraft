@@ -24,6 +24,7 @@ OLLAMA_API_KEY=your-api-key-here  # For Ollama Cloud
 OPENAI_API_KEY=sk-your-api-key-here
 GROQ_API_KEY=gsk_your-api-key-here
 GOOGLE_API_KEY=your-google-api-key
+ANTHROPIC_API_KEY=sk-ant-your-api-key-here
 
 # Custom OpenAI-compatible providers (if not using named profiles)
 CUSTOM_API_KEY=your-custom-api-key
@@ -514,6 +515,7 @@ CommitCraft supports environment variables for all configuration options. This i
 | `OPENAI_API_KEY` | OpenAI | OpenAI API key |
 | `GROQ_API_KEY` | Groq | Groq API key |
 | `GOOGLE_API_KEY` | Google | Google Gemini API key |
+| `ANTHROPIC_API_KEY` | Anthropic | Anthropic Claude API key |
 | `CUSTOM_API_KEY` | OpenAI-compatible | Generic API key for custom providers |
 | `{NICKNAME}_API_KEY` | Named providers | API key for named provider (uppercase nickname) |
 

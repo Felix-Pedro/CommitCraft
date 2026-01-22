@@ -32,7 +32,7 @@ Control which AI model generates your message.
 
 | Option | Env Variable | Description | Default |
 | :--- | :--- | :--- | :--- |
-| `--provider` | `COMMITCRAFT_PROVIDER` | AI Provider (`ollama`, `ollama_cloud`, `groq`, `google`, `openai`, `openai_compatible`). | `ollama` |
+| `--provider` | `COMMITCRAFT_PROVIDER` | AI Provider (`ollama`, `ollama_cloud`, `groq`, `google`, `openai`, `anthropic`, `openai_compatible`). | `ollama` |
 | `--model` | `COMMITCRAFT_MODEL` | Specific model name (e.g., `llama3`, `gpt-4`). | Provider dependent (see table below) |
 | `--system-prompt` | `COMMITCRAFT_SYSTEM_PROMPT` | Override the default system prompt. | |
 | `--temperature` | `COMMITCRAFT_TEMPERATURE` | Creativity level (0.0 - 1.0). | Config dependent |
@@ -55,19 +55,20 @@ When no `--model` is specified, CommitCraft uses the following defaults:
 | `openai` | `gpt-3.5-turbo` | OpenAI API |
 | `google` | `gemini-2.5-flash` | Google Gemini API |
 | `groq` | `qwen/qwen3-32b` | Groq API |
+| `anthropic` | **Required** | No default - must specify model (e.g., `claude-3-5-sonnet-20241022`) |
 | `openai_compatible` | **Required** | No default - must specify model |
 
 #### Provider-Specific Options Support
 
 Different providers support different configuration options:
 
-| Option | Ollama | Ollama Cloud | OpenAI | Google | Groq | OpenAI-Compatible |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `temperature` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `max_tokens` | ✅ | ✅ | ✅ | ✅ (`max_output_tokens`) | ✅ | ✅ |
-| `top_p` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `num_ctx` | ✅ (auto-calculated) | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `host` | ✅ (optional) | ❌ (fixed to `https://ollama.com`) | ❌ | ❌ | ❌ | ✅ (required) |
+| Option | Ollama | Ollama Cloud | OpenAI | Google | Groq | Anthropic | OpenAI-Compatible |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `temperature` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `max_tokens` | ✅ | ✅ | ✅ | ✅ (`max_output_tokens`) | ✅ | ✅ | ✅ |
+| `top_p` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `num_ctx` | ✅ (auto-calculated) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `host` | ✅ (optional) | ❌ (fixed to `https://ollama.com`) | ❌ | ❌ | ❌ | ❌ | ✅ (required) |
 
 **Notes:**
 - **Ollama** auto-calculates `num_ctx` based on diff size if not specified (min: 1024, max: 128000)

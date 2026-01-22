@@ -312,6 +312,7 @@ Enum of supported AI providers.
 - `Provider.openai` - OpenAI API
 - `Provider.google` - Google Gemini API
 - `Provider.groq` - Groq API
+- `Provider.anthropic` - Anthropic Claude models
 - `Provider.openai_compatible` - OpenAI-compatible endpoints
 
 **Example:**

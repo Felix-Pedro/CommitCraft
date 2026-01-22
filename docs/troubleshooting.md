@@ -134,6 +134,14 @@ Alternatively, modify the hook to use the full path to commitcraft:
 3. Regenerate your API key at [ollama.com/settings/keys](https://ollama.com/settings/keys)
 4. Ensure no extra whitespace in the API key
 
+### Anthropic Authentication / Credit Errors
+**Error:** `authentication_error` or `permission_error` or `insufficient_quota`
+
+**Solution:**
+1. Verify `ANTHROPIC_API_KEY` is set and correct.
+2. Check your credit balance in the [Anthropic Console](https://console.anthropic.com/settings/billing).
+3. Ensure you have access to the specific model you are trying to use (e.g., some models require tier upgrades).
+
 ### Wrong Model Output Format
 **Issue:** Model outputs in unexpected format or includes thinking tags you don't want to see
 
