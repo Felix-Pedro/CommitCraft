@@ -9,6 +9,7 @@ details like authentication, API endpoints, and option filtering.
 """
 
 import os
+import warnings
 from abc import ABC, abstractmethod
 
 
@@ -44,6 +45,12 @@ class LLMProviderError(Exception):
     pass
 
 
+class CommitCraftWarning(UserWarning):
+    """Base warning for CommitCraft."""
+
+    pass
+
+
 class APIKeyMissingError(LLMProviderError):
     """Raised when a required API key is missing."""
 
@@ -65,12 +72,16 @@ class LLMProvider(ABC):
     # Subclasses can set this to specify the environment variable name for API key
     api_key_env_var: str | None = None
 
+    # Subclasses should set this to match the provider registry name
+    provider_name: str = "unknown"
+
     def __init__(
         self,
         model: str,
         api_key: str | None = None,
         host: str | None = None,
         options: dict | None = None,
+        nickname: str | None = None,
     ):
         """
         Initialize the provider.
@@ -80,11 +91,13 @@ class LLMProvider(ABC):
             api_key: Optional API key for authentication
             host: Optional host URL for custom endpoints
             options: Optional model parameters (temperature, max_tokens, etc.)
+            nickname: Optional user-defined name for this provider instance
         """
         self.model = model
         self.api_key = api_key
         self.host = host
         self.options = options or {}
+        self.nickname = nickname
 
         # Validate API key requirement
         if self.requires_api_key and not self.api_key:
@@ -129,7 +142,17 @@ class LLMProvider(ABC):
         combined_text = system_prompt + user_prompt
         token_count = self._count_tokens(combined_text)
 
-        return {"token_count": token_count, "model": self.model}
+        result = {
+            "token_count": token_count,
+            "model": self.model,
+            "provider": self.nickname if self.nickname else self.provider_name,
+        }
+
+        # Add host URL if present (for custom endpoints)
+        if self.host:
+            result["host"] = self.host
+
+        return result
 
     def _count_tokens(self, text: str) -> int:
         """
@@ -172,6 +195,7 @@ class OllamaProvider(LLMProvider):
     """
 
     requires_api_key = False  # Ollama can work without API key
+    provider_name = "ollama"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Ollama's generate API."""
@@ -271,6 +295,7 @@ class OllamaCloudProvider(LLMProvider):
 
     requires_api_key = True
     api_key_env_var = "OLLAMA_API_KEY"
+    provider_name = "ollama_cloud"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Ollama Cloud's chat API."""
@@ -311,6 +336,7 @@ class GroqProvider(LLMProvider):
 
     requires_api_key = True
     api_key_env_var = "GROQ_API_KEY"
+    provider_name = "groq"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Groq's chat completions API."""
@@ -342,6 +368,7 @@ class GoogleProvider(LLMProvider):
 
     requires_api_key = True
     api_key_env_var = "GOOGLE_API_KEY"
+    provider_name = "google"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using Google's Gemini API."""
@@ -384,27 +411,40 @@ class GoogleProvider(LLMProvider):
         try:
             client = genai.Client(api_key=api_key)
 
-            # Combine prompts for counting (Gemini usually counts both system and user)
-            # Or better, pass them distinctly if the API supports it in one call,
-            # but count_tokens usually takes 'contents'.
-            # System instruction is part of the config in generation, but for counting,
-            # we should check if it's counted separately.
-            # Per docs: system instructions consume tokens.
+            # Normalize model name for Google SDK
+            model_name = self.model
+            if not model_name.startswith("models/"):
+                model_name = f"models/{model_name}"
 
-            # Construct content similar to generation
-            contents = [user_prompt]
-            config = {}
+            # Combine prompts for counting (Gemini usually counts both system and user)
+            # system_instruction is not supported in CountTokensConfig, so we add it to contents
+            contents = []
             if system_prompt:
-                config["system_instruction"] = system_prompt
+                contents.append(system_prompt)
+            contents.append(user_prompt)
 
             response = client.models.count_tokens(
-                model=self.model,
+                model=model_name,
                 contents=contents,
-                config=types.GenerateContentConfig(**config),
             )
 
-            return {"token_count": response.total_tokens, "model": self.model}
-        except Exception:
+            result = {
+                "token_count": response.total_tokens,
+                "model": self.model,
+                "provider": self.nickname if self.nickname else self.provider_name,
+            }
+
+            # Add host URL if present
+            if self.host:
+                result["host"] = self.host
+
+            return result
+        except Exception as e:
+            warnings.warn(
+                f"Failed to use native Google token counting for model '{self.model}'. "
+                f"Falling back to tiktoken estimation. Error: {e}",
+                CommitCraftWarning,
+            )
             # Fallback to tiktoken/heuristic if API fails (e.g. auth error during dry-run)
             return super().calculate_usage(system_prompt, user_prompt)
 
@@ -414,6 +454,7 @@ class OpenAIProvider(LLMProvider):
 
     requires_api_key = True
     api_key_env_var = "OPENAI_API_KEY"
+    provider_name = "openai"
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using OpenAI's chat completions API."""
@@ -459,6 +500,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
     requires_api_key = False  # Some compatible APIs don't require keys
     api_key_env_var = "CUSTOM_API_KEY"
+    provider_name = "openai_compatible"
 
     def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
         """Calculate token usage, using Gemini tokenizer if applicable."""
@@ -473,19 +515,47 @@ class OpenAICompatibleProvider(LLMProvider):
                 if google_api_key:
                     client = genai.Client(api_key=google_api_key)
 
-                    contents = [user_prompt]
-                    config = {}
+                    # Normalize model name for Google SDK (e.g., 'gemini/gemini-pro' -> 'models/gemini-pro')
+                    model_name = self.model
+                    if "/" in model_name:
+                        # Handle cases like 'gemini/gemini-pro' or 'google/gemini-pro'
+                        # but preserve 'models/gemini-pro' if already present
+                        parts = model_name.split("/")
+                        if parts[0] != "models":
+                            model_name = parts[-1]
+
+                    if not model_name.startswith("models/"):
+                        model_name = f"models/{model_name}"
+
+                    contents = []
                     if system_prompt:
-                        config["system_instruction"] = system_prompt
+                        contents.append(system_prompt)
+                    contents.append(user_prompt)
 
                     response = client.models.count_tokens(
-                        model=self.model,
+                        model=model_name,
                         contents=contents,
-                        config=types.GenerateContentConfig(**config),
                     )
 
-                    return {"token_count": response.total_tokens, "model": self.model}
-            except Exception:
+                    result = {
+                        "token_count": response.total_tokens,
+                        "model": self.model,
+                        "provider": self.nickname
+                        if self.nickname
+                        else self.provider_name,
+                    }
+
+                    # Add host URL if present
+                    if self.host:
+                        result["host"] = self.host
+
+                    return result
+            except Exception as e:
+                warnings.warn(
+                    f"Failed to use native Google token counting for model '{self.model}'. "
+                    f"Falling back to tiktoken estimation. Error: {e}",
+                    CommitCraftWarning,
+                )
                 # Fallback to tiktoken if Google SDK fails or key missing
                 pass
 
@@ -563,6 +633,7 @@ def get_provider(
     api_key: str | None = None,
     host: str | None = None,
     options: dict | None = None,
+    nickname: str | None = None,
 ) -> LLMProvider:
     """
     Factory function to create a provider instance.
@@ -573,6 +644,7 @@ def get_provider(
         api_key: Optional API key
         host: Optional host URL
         options: Optional model parameters
+        nickname: Optional user-defined name for this provider instance
 
     Returns:
         Configured provider instance
@@ -594,4 +666,5 @@ def get_provider(
         api_key=api_key,
         host=host,
         options=options,
+        nickname=nickname,
     )

@@ -202,6 +202,7 @@ class LModel(BaseModel):
         options: Optional model parameters (temperature, max_tokens, etc.)
         host: Optional host URL (required for openai_compatible, optional for ollama)
         api_key: Optional API key for authentication
+        nickname: Optional user-defined name for this provider instance (from [providers] section)
     """
 
     provider: Provider = Provider.ollama
@@ -214,6 +215,7 @@ class LModel(BaseModel):
         None  # required for openai_compatible
     )
     api_key: str | None = None
+    nickname: str | None = None
 
     @model_validator(mode="after")
     def set_model_default(self):
@@ -374,6 +376,7 @@ def commit_craft(
             api_key=models.api_key,
             host=str(models.host) if models.host else None,
             options=model_options,
+            nickname=models.nickname,
         )
 
         if dry_run:

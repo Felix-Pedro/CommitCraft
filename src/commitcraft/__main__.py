@@ -746,6 +746,9 @@ def main(
             if resolved_api_key:
                 base_model_config["api_key"] = resolved_api_key
 
+            # Store the nickname so it can be displayed in dry-run output
+            base_model_config["nickname"] = nickname
+
             # Initialize LModel using the named config
             # We must be careful not to override 'provider' with the nickname in the next step
             model_config = LModel(**base_model_config)
@@ -801,6 +804,7 @@ def main(
             host=host if host else model_config.host,
             api_key=model_config.api_key,  # Preserve resolved key
             options=LModelOptions(**model_options),
+            nickname=model_config.nickname,  # Preserve nickname for named providers
         )
 
         # Construct the request using provided arguments or defaults
