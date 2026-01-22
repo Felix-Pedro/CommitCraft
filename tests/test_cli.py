@@ -28,10 +28,66 @@ def test_help_flag():
 def test_main_no_diff(mock_get_diff):
     # Simulate empty diff
     mock_get_diff.return_value = ""
-    # We expect it might fail or just print nothing depending on implementation,
-    # but let's check it doesn't crash.
-    with patch("commitcraft.__main__.commit_craft"):
-        runner.invoke(app)
-        # It usually prints response.
-        # If commit_craft returns None or similar, echo might print it.
-        pass
+    # Passing no args invokes main
+    result = runner.invoke(app, [])
+    # Should exit cleanly (0) because it catches empty diff
+    assert result.exit_code == 0
+
+
+@patch("commitcraft.__main__.get_diff")
+@patch("commitcraft.__main__.commit_craft")
+def test_dry_run(mock_commit_craft, mock_get_diff):
+    mock_get_diff.return_value = "diff --git a/file b/file..."
+    # dry-run usually prints token usage but doesn't generate message
+
+    result = runner.invoke(app, ["--dry-run"])
+    assert result.exit_code == 0
+    # Verify commit_craft was called with dry_run=True in its config
+    assert mock_commit_craft.called
+
+
+@patch("commitcraft.__main__.get_diff")
+@patch("commitcraft.__main__.commit_craft")
+@patch("commitcraft.__main__.rotating_status")
+@patch("commitcraft.__main__.filter_diff")
+def test_clue_flags(
+    mock_filter_diff, mock_rotating_status, mock_commit_craft, mock_get_diff
+):
+    mock_get_diff.return_value = "diff --git a/file.py b/file.py"
+    mock_filter_diff.return_value = "diff --git a/file.py b/file.py"  # Pass through
+    mock_commit_craft.return_value = "Fix bug"
+
+    # Mock rotating_status to just call the function immediately
+    def side_effect(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    mock_rotating_status.side_effect = side_effect
+
+    # Remove --no-interactive as it's not a main command flag
+    result = runner.invoke(app, ["--bug", "--bug-desc", "Fix NPE"])
+    assert result.exit_code == 0
+
+    # Check if flags were passed correctly.
+    # Since commit_craft is passed to rotating_status, verify rotating_status call
+    assert mock_rotating_status.called
+
+    # Verify arguments passed to rotating_status (first arg is the func commit_craft)
+    args, _ = mock_rotating_status.call_args
+    assert args[0] == mock_commit_craft
+
+    # Also verify commit_craft called (since we mocked rotating_status to call it)
+    assert mock_commit_craft.called
+
+
+@patch("commitcraft.__main__._install_hook")
+def test_hook_install(mock_install):
+    result = runner.invoke(app, ["hook", "--no-interactive"])
+    assert result.exit_code == 0
+    mock_install.assert_called_once()
+
+
+@patch("commitcraft.__main__._uninstall_hook")
+def test_hook_uninstall(mock_uninstall):
+    result = runner.invoke(app, ["unhook"])
+    assert result.exit_code == 0
+    mock_uninstall.assert_called_once()

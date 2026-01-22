@@ -15,8 +15,15 @@ def tests(session):
     # Install the package itself in editable mode
     session.install("-e", ".")
 
-    # Run pytest with coverage
-    session.run("pytest", "--cov=commitcraft", "--cov-report=term-missing", "tests/")
+    # Run pytest with coverage, excluding live tests by default
+    session.run(
+        "pytest",
+        "-m",
+        "not live",
+        "--cov=commitcraft",
+        "--cov-report=term-missing",
+        "tests/",
+    )
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
