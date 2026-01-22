@@ -449,6 +449,74 @@ class GoogleProvider(LLMProvider):
             return super().calculate_usage(system_prompt, user_prompt)
 
 
+class AnthropicProvider(LLMProvider):
+    """Provider for Anthropic's Claude models."""
+
+    requires_api_key = True
+    api_key_env_var = "ANTHROPIC_API_KEY"
+    provider_name = "anthropic"
+
+    def generate(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate response using Anthropic's Messages API."""
+        import anthropic
+
+        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
+        client = anthropic.Anthropic(api_key=api_key)
+
+        # Filter to supported options
+        # Anthropic supports: max_tokens, temperature, top_p (and others)
+        filtered_options = self._filter_options(("max_tokens", "temperature", "top_p"))
+
+        try:
+            response = client.messages.create(
+                model=self.model,
+                max_tokens=filtered_options.get(
+                    "max_tokens", 1024
+                ),  # Required parameter
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                **{k: v for k, v in filtered_options.items() if k != "max_tokens"},
+            )
+            return response.content[0].text
+        except Exception as e:
+            raise LLMProviderError(f"Anthropic generation failed: {e}") from e
+
+    def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
+        """Calculate token usage using Anthropic's native count_tokens API."""
+        import anthropic
+
+        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
+
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+
+            response = client.messages.count_tokens(
+                model=self.model,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+
+            result = {
+                "token_count": response.input_tokens,
+                "model": self.model,
+                "provider": self.nickname if self.nickname else self.provider_name,
+            }
+
+            # Add host URL if present (though rarely used with Anthropic)
+            if self.host:
+                result["host"] = self.host
+
+            return result
+        except Exception as e:
+            warnings.warn(
+                f"Failed to use native Anthropic token counting for model '{self.model}'. "
+                f"Falling back to tiktoken estimation. Error: {e}",
+                CommitCraftWarning,
+            )
+            # Fallback to tiktoken if API fails (e.g. auth error during dry-run)
+            return super().calculate_usage(system_prompt, user_prompt)
+
+
 class OpenAIProvider(LLMProvider):
     """Provider for OpenAI's GPT models."""
 
@@ -503,7 +571,53 @@ class OpenAICompatibleProvider(LLMProvider):
     provider_name = "openai_compatible"
 
     def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
-        """Calculate token usage, using Gemini tokenizer if applicable."""
+        """Calculate token usage, using native tokenizers for Gemini/Claude if applicable."""
+        # If it's a Claude model being accessed via OpenAI-compatible proxy (LiteLLM, OpenRouter),
+        # try to use native Anthropic token counting
+        if "claude" in self.model.lower():
+            try:
+                import anthropic
+
+                # Use ANTHROPIC_API_KEY for counting even if using CUSTOM_API_KEY for generation
+                anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+                if anthropic_api_key:
+                    client = anthropic.Anthropic(api_key=anthropic_api_key)
+
+                    # Normalize model name for Anthropic SDK
+                    # Handle cases like 'anthropic/claude-3-5-sonnet' or 'claude-3-5-sonnet-20241022'
+                    model_name = self.model
+                    if "/" in model_name:
+                        # Extract the actual model name after the slash
+                        model_name = model_name.split("/")[-1]
+
+                    response = client.messages.count_tokens(
+                        model=model_name,
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": user_prompt}],
+                    )
+
+                    result = {
+                        "token_count": response.input_tokens,
+                        "model": self.model,
+                        "provider": self.nickname
+                        if self.nickname
+                        else self.provider_name,
+                    }
+
+                    # Add host URL if present
+                    if self.host:
+                        result["host"] = self.host
+
+                    return result
+            except Exception as e:
+                warnings.warn(
+                    f"Failed to use native Anthropic token counting for model '{self.model}'. "
+                    f"Falling back to tiktoken estimation. Error: {e}",
+                    CommitCraftWarning,
+                )
+                # Fallback to tiktoken if Anthropic SDK fails or key missing
+                pass
+
         # If it's a Gemini model being accessed via OpenAI proxy, try to use native counting
         if "gemini" in self.model.lower():
             try:
@@ -622,6 +736,7 @@ PROVIDER_REGISTRY: dict[str, type[LLMProvider]] = {
     "ollama_cloud": OllamaCloudProvider,
     "groq": GroqProvider,
     "google": GoogleProvider,
+    "anthropic": AnthropicProvider,
     "openai": OpenAIProvider,
     "openai_compatible": OpenAICompatibleProvider,
 }

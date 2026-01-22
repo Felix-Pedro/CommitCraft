@@ -188,6 +188,7 @@ class Provider(str, Enum):
     openai = "openai"
     google = "google"
     groq = "groq"
+    anthropic = "anthropic"
     openai_compatible = "openai_compatible"
 
 

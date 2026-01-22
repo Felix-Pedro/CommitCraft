@@ -10,12 +10,14 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 ### Changed
 
 - **Package Manager Migration**: Migrated from Poetry to uv for faster dependency management and simpler tooling. Development commands now use `uv sync` and `uv run` instead of `poetry install` and `poetry run`. Both `uv tool install` and `pipx install` are supported for end-user installation.
-- **All Providers by Default**: The default installation now includes all providers (Ollama, OpenAI, Groq, Google) out of the box.
-- **Provider System Refactored**: Internal provider implementation now uses a registry pattern with abstract base classes (`LLMProvider`) for better maintainability and extensibility. This is a non-breaking internal refactor that makes it easier to add new LLM providers. All existing provider names, CLI arguments, and configuration options work identically.
+- **All Providers by Default**: The default installation now includes all providers (Ollama, OpenAI, Groq, Google, Anthropic) out of the box.
+- **Provider System Refactored**: Internal provider implementation now uses a registry pattern with abstract base classes (`LLMProvider`) for better maintainability and extensibility. This is a non-breaking internal refactor that makes it easier to add new LLM providers. All existing provider names, CLI arguments, and configuration options work identically. Includes improved API key handling with explicit `requires_api_key` declarations, better error messages, support for local/unauthenticated services, and enhanced token counting with tiktoken integration and graceful fallbacks.
 
 ### Added
 
-- **Dry Run Mode**: Added `--dry-run` flag to the CLI which calculates and displays token usage statistics (input tokens, estimated cost, context utilization) without making a request to the LLM or generating a commit message. Supports both Rich table output and JSON output (with `--plain`).
+- **Anthropic Provider**: Added native support for Anthropic's Claude models with automatic token counting via Anthropic's `count_tokens()` API. Includes intelligent Claude model detection when using OpenAI-compatible routers (LiteLLM, OpenRouter) - automatically uses native Anthropic token counting for accurate estimates. Supports all Claude models including Claude Sonnet 4.5. Requires `ANTHROPIC_API_KEY` environment variable.
+- **Enhanced Dry Run Output**: Dry run mode (`--dry-run`) now displays provider name and host URL for better transparency. When using named provider profiles from `[providers]` config, shows the user-defined nickname (e.g., "litellm") instead of the generic provider type (e.g., "openai_compatible").
+- **Dry Run Mode**: Added `--dry-run` flag to the CLI which calculates and displays token usage statistics (input tokens, model name, provider, host, context utilization) without making a request to the LLM or generating a commit message. Supports both Rich table output and JSON output (with `--plain`).
 - **Amend Mode**: Added `--amend` flag to generate commit messages for `git commit --amend`. It intelligently calculates the diff by comparing the current index against the parent of HEAD (or the empty tree if amending a root commit).
 - **Default Ignore Patterns**: Lock files, minified assets, source maps, and other noisy files are now ignored by default when generating commit messages. Default patterns include `*.lock`, `package-lock.json`, `pnpm-lock.yaml`, `*.min.js`, `*.min.css`, `*.map`, `*.snap`, `*.pb.go`, `*.pb.js`, `*_generated.*`, `*.d.ts`, and `*.svg`.
 - **Generate Ignore File**: Added `CommitCraft config --generate-ignore` (or `-i`) to quickly create a `.commitcraft/.ignore` file with default patterns for customization. The interactive config wizard also prompts to generate this file.
@@ -28,19 +30,9 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ### Fixed
 
-- **Google Provider Token Counting**: Fixed a compatibility issue in `calculate_usage()` for the Google provider (and Gemini models via OpenAI-compatible provider). The `count_tokens` API does not support `system_instruction` in `CountTokensConfig`, so the system prompt is now correctly included in the `contents` list instead. Additionally, normalized model names (e.g. adding `models/` prefix) to ensure correct API usage.
-- **Graceful Token Counting Fallback**: When native Google token counting fails (e.g., model not found), CommitCraft now issues a `CommitCraftWarning` (which can be suppressed via `PYTHONWARNINGS`) and falls back to `tiktoken` estimation instead of crashing or failing silently.
+- **Empty Diff Validation**: Added validation to prevent wasted API calls when there are no staged changes or all changes are filtered out by ignore patterns. Now displays a helpful message: "No staged changes to analyze. Either there are no staged changes, or all files are ignored by the filter patterns."
 - **Pydantic v2 Compatibility**: Updated `model_dump()` and `ConfigDict` usage to address deprecation warnings when running with Pydantic v2.
 - **Git Error Handling**: Added comprehensive error handling for `get_diff()` function. Now properly catches and reports errors when git is not installed or when git commands fail (e.g., not in a git repository).
-- **Provider API Key Handling**: Significantly improved API key handling to properly support providers with different authentication requirements:
-  - Providers now explicitly declare if they require API keys via `requires_api_key` attribute
-  - Added `api_key_env_var` hints for better error messages (e.g., "Set OPENAI_API_KEY environment variable")
-  - OpenAI-compatible provider now detects authentication failures at runtime and provides helpful error messages
-  - Fixed security issue: No longer sends dummy API keys (like "nokey") to third-party APIs - passes `None` instead and lets the service handle it
-  - Supports local/unauthenticated services (LocalAI, local vLLM, local Ollama) without requiring dummy keys
-  - Clear distinction between: mandatory keys (OpenAI, Groq, Google), optional keys (Ollama), and service-dependent keys (OpenAI-compatible)
-- **Context Size Calculation**: Significantly improved Ollama context size calculation with tiktoken for accurate token counting (now a required dependency). Uses cl100k_base encoding which works well for all modern models (Qwen, Llama, Gemma, Mistral). Falls back to empirically-tested character-to-token ratio (2.64, determined via promptfoo testing) only if tiktoken fails to load. Adds 60% buffer for response generation and overhead.
-- **Empty Diff Validation**: Added validation to prevent wasted API calls when there are no staged changes or all changes are filtered out by ignore patterns. Now displays a helpful message: "No staged changes to analyze. Either there are no staged changes, or all files are ignored by the filter patterns."
 - **Type Hints Modernization**: Updated all type hints to use modern Python 3.10+ syntax (`str | None` instead of `Optional[str]`, `dict[str, str]` instead of `Dict[str, str]`), improving consistency and readability.
 - **Dead Code Removal**: Removed commented-out code blocks in `clue_parser()` and other functions, improving code cleanliness.
 
