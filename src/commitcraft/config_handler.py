@@ -27,13 +27,22 @@ def get_input_with_default(prompt_text, default_val):
 
 
 def get_masked_input(prompt_text):
-    return Prompt.ask(prompt_text, password=True)
+    """Get masked input, returning None if empty to allow environment variable fallback."""
+    result = Prompt.ask(prompt_text, password=True)
+    # Return None for empty strings to allow env var fallback in fetch_models
+    return result if result else None
 
 
 def fetch_models(provider, api_key=None, host=None):
+    import os
+
     try:
         if provider == "ollama":
             import ollama
+
+            # Try to get API key from environment if not provided
+            if not api_key:
+                api_key = os.getenv("OLLAMA_API_KEY")
 
             client_args = {"host": host}
             if api_key:
@@ -43,18 +52,57 @@ def fetch_models(provider, api_key=None, host=None):
         elif provider == "openai":
             from openai import OpenAI
 
+            # Try to get API key from environment if not provided
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY")
+
             client = OpenAI(api_key=api_key)
             return [m.id for m in client.models.list()]
         elif provider == "groq":
             from groq import Groq
+
+            # Try to get API key from environment if not provided
+            if not api_key:
+                api_key = os.getenv("GROQ_API_KEY")
 
             client = Groq(api_key=api_key)
             return [m.id for m in client.models.list().data]
         elif provider == "google":
             from google import genai
 
+            # Try to get API key from environment if not provided
+            if not api_key:
+                api_key = os.getenv("GOOGLE_API_KEY")
+
             client = genai.Client(api_key=api_key)
             return [m.name for m in client.models.list()]
+        elif provider == "anthropic":
+            import requests
+
+            # Try to get API key from environment if not provided
+            if not api_key:
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+
+            if not api_key:
+                return []  # Can't fetch without API key
+
+            # Anthropic doesn't have a Python SDK method for listing models
+            # Use their REST API endpoint directly
+            headers = {
+                "anthropic-version": "2023-06-01",
+                "X-Api-Key": api_key,
+            }
+            response = requests.get(
+                "https://api.anthropic.com/v1/models", headers=headers, timeout=10
+            )
+            response.raise_for_status()
+            models_data = response.json()
+
+            # Extract model IDs from the response
+            # The response structure is: {"data": [{"id": "model-name", ...}, ...]}
+            if "data" in models_data:
+                return [model["id"] for model in models_data["data"]]
+            return []
         elif provider == "openai_compatible":
             from openai import OpenAI
 
@@ -99,6 +147,7 @@ def configure_provider(
         "openai",
         "google",
         "groq",
+        "anthropic",
         "openai_compatible",
     ]
 
@@ -198,6 +247,7 @@ def configure_provider(
             "openai": "OPENAI_API_KEY",
             "groq": "GROQ_API_KEY",
             "google": "GOOGLE_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
             "openai_compatible": "CUSTOM_API_KEY",
             "ollama": "OLLAMA_API_KEY",
         }
@@ -240,6 +290,8 @@ def configure_provider(
             default_model = "qwen/qwen3-32b"
         elif final_provider_type == "google":
             default_model = "gemini-1.5-pro"
+        elif final_provider_type == "anthropic":
+            default_model = "claude-sonnet-4-5-20250929"
 
     while True:
         model_name_input = get_input_with_default(
@@ -439,6 +491,7 @@ def interactive_config():
                 "openai",
                 "google",
                 "groq",
+                "anthropic",
                 "openai_compatible",
             ]
             typer.echo(f"Known providers: {', '.join(KNOWN_PROVIDERS)}")
