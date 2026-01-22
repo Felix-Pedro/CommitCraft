@@ -197,7 +197,7 @@ class LModel(BaseModel):
     Model configuration containing provider, model name, system prompt, options, and host.
 
     Attributes:
-        provider: The LLM provider (ollama, openai, google, groq, openai_compatible)
+        provider: The LLM provider (ollama, openai, google, groq, anthropic, openai_compatible)
         model: Model name/identifier (auto-set based on provider if not provided)
         system_prompt: Optional custom system prompt
         options: Optional model parameters (temperature, max_tokens, etc.)

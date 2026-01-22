@@ -900,6 +900,10 @@ def config(
 
     Use [cyan]--generate-ignore[/cyan] to create a .ignore file with default patterns.
     """
+    # Load .env files to make API keys available for model listing
+    load_dotenv(os.path.join(os.getcwd(), ".env"))
+    load_dotenv(os.path.join(os.getcwd(), "CommitCraft.env"))
+
     if generate_ignore:
         ignore_dir = ".commitcraft"
         ignore_file = os.path.join(ignore_dir, ".ignore")

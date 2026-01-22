@@ -100,16 +100,25 @@ class LLMProvider(ABC):
         self.nickname = nickname
 
         # Validate API key requirement
+        # Check if api_key is provided OR if it's available in environment
         if self.requires_api_key and not self.api_key:
-            env_hint = (
-                f" Set {self.api_key_env_var} environment variable"
-                if self.api_key_env_var
-                else ""
-            )
-            raise APIKeyMissingError(
-                f"{self.__class__.__name__} requires an API key.{env_hint} "
-                f"or provide it in your configuration file."
-            )
+            # Try to get from environment variable as fallback
+            if self.api_key_env_var:
+                env_api_key = os.getenv(self.api_key_env_var)
+                if env_api_key:
+                    self.api_key = env_api_key
+
+            # If still no API key found, raise error
+            if not self.api_key:
+                env_hint = (
+                    f" Set {self.api_key_env_var} environment variable"
+                    if self.api_key_env_var
+                    else ""
+                )
+                raise APIKeyMissingError(
+                    f"{self.__class__.__name__} requires an API key.{env_hint} "
+                    f"or provide it in your configuration file."
+                )
 
     @abstractmethod
     def generate(self, system_prompt: str, user_prompt: str) -> str:
