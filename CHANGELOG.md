@@ -28,6 +28,8 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- **Google Provider Token Counting**: Fixed a compatibility issue in `calculate_usage()` for the Google provider (and Gemini models via OpenAI-compatible provider). The `count_tokens` API does not support `system_instruction` in `CountTokensConfig`, so the system prompt is now correctly included in the `contents` list instead. Additionally, normalized model names (e.g. adding `models/` prefix) to ensure correct API usage.
+- **Graceful Token Counting Fallback**: When native Google token counting fails (e.g., model not found), CommitCraft now issues a `CommitCraftWarning` (which can be suppressed via `PYTHONWARNINGS`) and falls back to `tiktoken` estimation instead of crashing or failing silently.
 - **Pydantic v2 Compatibility**: Updated `model_dump()` and `ConfigDict` usage to address deprecation warnings when running with Pydantic v2.
 - **Git Error Handling**: Added comprehensive error handling for `get_diff()` function. Now properly catches and reports errors when git is not installed or when git commands fail (e.g., not in a git repository).
 - **Provider API Key Handling**: Significantly improved API key handling to properly support providers with different authentication requirements:
