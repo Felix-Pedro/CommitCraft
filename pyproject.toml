@@ -69,3 +69,8 @@ dev = [
     "nox>=2025.11.12,<2026.0.0",
     "pytest>=9.0.2,<10.0.0",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "live: marks tests as live integration tests that require API keys (deselect with '-m \"not live\"')",
+]

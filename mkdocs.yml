@@ -47,10 +47,14 @@ nav:
   - User Guide:
     - CLI Reference: cli.md
     - Configuration: config.md
+    - Default Values: defaults.md
     - Recipes & Tips: recipes.md
     - Troubleshooting: troubleshooting.md
+    - Migration Guide: migration.md
   - API Reference: reference.md
-  - Contributing: contributing.md
-  - Code of Conduct: CONDUCT.md
+  - Development:
+    - Contributing: contributing.md
+    - Testing: testing.md
+    - Code of Conduct: CONDUCT.md
   - Changelog: changelog.md
   - License: license.md

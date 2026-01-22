@@ -200,6 +200,9 @@ CommitCraft --bug-desc "Fixed null pointer in user authentication" --provider ol
 
 # Use custom provider with specific temperature
 CommitCraft --provider openai --model gpt-4 --temperature 0.3 --max-tokens 500
+
+# Use Anthropic Claude
+CommitCraft --provider anthropic --model claude-3-5-sonnet-20241022 --temperature 0.5
 ```
 
 ### Example Configuration File

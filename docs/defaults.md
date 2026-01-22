@@ -215,6 +215,7 @@ When `model` is not specified, these defaults are used:
 | `openai` | `gpt-3.5-turbo` | |
 | `google` | `gemini-2.5-flash` | |
 | `groq` | `qwen/qwen3-32b` | |
+| `anthropic` | **None** (required) | Must specify model |
 | `openai_compatible` | **None** (required) | Must specify model |
 
 ---
@@ -273,6 +274,7 @@ def get_context_size(diff: str, system: str) -> int:
 | OpenAI | `OPENAI_API_KEY` | - |
 | Google | `GOOGLE_API_KEY` | - |
 | Groq | `GROQ_API_KEY` | - |
+| Anthropic | `ANTHROPIC_API_KEY` | - |
 | OpenAI-compatible | `CUSTOM_API_KEY` | - |
 
 ### Named Providers

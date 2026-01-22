@@ -50,9 +50,13 @@ Ready to get started? Here's how you can set up **CommitCraft** for local develo
 
 3. **Install Dependencies**
 
-   Install the necessary dependencies using `poetry`:
+   Install the necessary dependencies using `uv` (CommitCraft has migrated from Poetry):
    ```bash
-   poetry install
+   # Install uv if you haven't already
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Sync dependencies
+   uv sync
    ```
 
 4. **Create a Branch**

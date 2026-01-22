@@ -134,17 +134,26 @@ provider = "ollama_cloud"
 model = "qwen3"
 ```
 
-```bash
-# Set API key
-export OLLAMA_API_KEY=ollama-your-key
+#### 2. Anthropic Provider
 
-# Use Ollama Cloud
-CommitCraft --provider ollama_cloud
+Native support for Anthropic's Claude models:
+
+```toml
+[models]
+provider = "anthropic"
+# Model is required (no default)
+model = "claude-3-5-sonnet-20241022"
 ```
 
-See the [Ollama Cloud Setup Guide](config.md#ollama-cloud-setup-guide) for details.
+```bash
+# Set API key
+export ANTHROPIC_API_KEY=sk-ant-your-key
 
-#### 2. Named Provider Profiles
+# Use Anthropic
+CommitCraft --provider anthropic --model claude-3-5-sonnet-20241022
+```
+
+#### 3. Named Provider Profiles
 
 Configure multiple provider instances with different settings:
 
