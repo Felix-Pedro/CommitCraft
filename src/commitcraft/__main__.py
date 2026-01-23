@@ -977,9 +977,6 @@ def _install_hook(global_hook: bool, interactive: bool = True, confirm: bool = F
 
     update_command = f"CommitCraft hook{update_flags}"
 
-    # Base CommitCraft command (never include --confirm here, as confirmation is handled by the hook itself)
-    commitcraft_base_cmd = "CommitCraft"
-
     # Track if confirmation was requested during installation
     hook_has_confirm = "1" if confirm else ""
 
