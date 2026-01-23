@@ -587,6 +587,47 @@ def interactive_config():
     else:
         config["emoji"] = {}  # Clear if disabled? or just don't use it.
 
+    # Update Check Settings
+    print("\n[blue][Update Check Settings][/blue]")
+    print(
+        "[dim]CommitCraft can automatically check for updates weekly (opt-out by default).[/dim]"
+    )
+    print("[dim]This helps ensure you get security patches and new features.[/dim]")
+
+    # Get existing settings or defaults
+    existing_updates = config.get("updates", {})
+    current_enabled = existing_updates.get("check_enabled", True)  # Opt-out by default
+    current_interval = existing_updates.get("check_interval_days", 7)
+
+    if not config.get("updates"):
+        config["updates"] = {}
+
+    if typer.confirm(
+        "Enable automatic update checks?",
+        default=current_enabled,
+    ):
+        config["updates"]["check_enabled"] = True
+
+        # Ask for check interval
+        interval_choice = typer.prompt(
+            "How often should CommitCraft check for updates? (days)",
+            default=str(current_interval),
+        )
+        try:
+            interval_days = int(interval_choice)
+            if interval_days < 1:
+                print(
+                    "[yellow]Interval must be at least 1 day. Using default (7 days).[/yellow]"
+                )
+                interval_days = 7
+            config["updates"]["check_interval_days"] = interval_days
+        except ValueError:
+            print("[yellow]Invalid number. Using default (7 days).[/yellow]")
+            config["updates"]["check_interval_days"] = 7
+    else:
+        config["updates"]["check_enabled"] = False
+        print("[cyan]Update checks disabled. You can re-enable this anytime.[/cyan]")
+
     # Save Config
     file_path = base_dir / f"config.{file_format}"
 
