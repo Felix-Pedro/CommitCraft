@@ -1097,7 +1097,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
     esac
 
     # Check if confirmation mode is enabled (via hook --confirm or COMMITCRAFT_CONFIRM env var)
-    ENABLE_CONFIRMATION=""
+    ENABLE_CONFIRMATION="{hook_has_confirm}"
     if [ -n "$COMMITCRAFT_CONFIRM" ]; then
         ENABLE_CONFIRMATION="1"
     fi
