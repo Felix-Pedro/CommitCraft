@@ -24,6 +24,8 @@ CommitCraft [OPTIONS] [COMMAND]
 | `--config-file` | | Path to a custom config file (`.toml`, `.yaml`, `.json`). | Checks `.commitcraft/` folder |
 | `--ignore` | | Comma-separated list of file patterns to exclude from the diff. | Checks `.commitcraft/.ignore` with default patterns |
 | `--debug-prompt` | | Print the generated prompt without sending it to the LLM. | `False` |
+| `--dry-run` | | Calculate token usage without generating a message. | `False` |
+| `--confirm` | | Enable two-step confirmation: show dry-run info, then ask for confirmation. | `False` |
 | `--amend` | | Generate message for `git commit --amend`. | `False` |
 
 ### Model Configuration
@@ -43,6 +45,7 @@ Control which AI model generates your message.
 | `--max-tokens` | `COMMITCRAFT_MAX_TOKENS` | Maximum number of tokens to generate. | Config dependent |
 | `--host` | `COMMITCRAFT_HOST` | API host URL (required for `openai_compatible`, optional for `ollama`). | `http://localhost:11434` (Ollama) |
 | `--show-thinking` | `COMMITCRAFT_SHOW_THINKING` | Display the model's "Chain of Thought" if available (e.g., DeepSeek R1). | `False` |
+| `--no-emoji` | `COMMITCRAFT_NO_EMOJI` | Disable emoji in commit messages (overrides config emoji settings). | `False` |
 
 #### Default Models by Provider
 
@@ -63,7 +66,7 @@ When no `--model` is specified, CommitCraft uses the following defaults:
 Different providers support different configuration options:
 
 | Option | Ollama | Ollama Cloud | OpenAI | Google | Groq | Anthropic | OpenAI-Compatible |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | `temperature` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `max_tokens` | ✅ | ✅ | ✅ | ✅ (`max_output_tokens`) | ✅ | ✅ | ✅ |
 | `top_p` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -141,6 +144,213 @@ CommitCraft --show-thinking
 
 **Note:** Models without thinking capabilities will not output anything different with this flag.
 
+#### Dry-Run Mode (`--dry-run`)
+
+The `--dry-run` flag calculates and displays token usage statistics **without** making an API call to generate a commit message. This is useful for:
+
+- Estimating costs before making API calls (especially with paid providers)
+- Checking if your diff is too large for the model's context window
+- Verifying your configuration is working correctly
+- Understanding token distribution between system prompt and user content
+
+**Usage:**
+```bash
+CommitCraft --dry-run
+```
+
+**Example Output (Ollama with context sizing):**
+```
+                    CommitCraft Dry Run                    
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Token Count         │ 3431                              │
+│ System Prompt Tokens│ 156                               │
+│ User Prompt Tokens  │ 3275                              │
+│ Model               │ qwen3-coder:latest                │
+│ Provider            │ ollama                            │
+│ Host                │ http://localhost:11434            │
+│ Context Size        │ 5489                              │
+│ Context Utilization │ 62.5%                             │
+└─────────────────────┴───────────────────────────────────┘
+```
+
+**Example Output (Google/OpenAI/Anthropic/Groq):**
+```
+         CommitCraft Dry Run          
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ Token Count         │ 4032                 │
+│ System Prompt Tokens│ 234                  │
+│ User Prompt Tokens  │ 3798                 │
+│ Model               │ gemini-2.0-flash-exp │
+│ Provider            │ google               │
+└─────────────────────┴──────────────────────┘
+```
+
+**Plain Text Output:**
+
+Use `--plain` or `--no-color` for JSON-style output:
+```bash
+CommitCraft --dry-run --plain
+```
+
+Output:
+```json
+{
+  "token_count": 3431,
+  "system_prompt_tokens": 156,
+  "user_prompt_tokens": 3275,
+  "model": "qwen3-coder:latest",
+  "provider": "ollama",
+  "host": "http://localhost:11434",
+  "context_size": 5489,
+  "context_utilization": "62.5%"
+}
+```
+
+**Understanding the Output:**
+
+- **Token Count:** Total tokens that will be sent to the LLM (system + user)
+- **System Prompt Tokens:** Tokens from your project context, guidelines, and emoji instructions
+- **User Prompt Tokens:** Tokens from the git diff and any CommitClues
+- **Context Size:** (Ollama only) The calculated context window size for the request
+- **Context Utilization:** (Ollama only) Percentage of context window used by the prompts
+
+**Use Cases:**
+
+```bash
+# Check token usage before expensive API call
+CommitCraft --dry-run --provider openai --model gpt-4
+
+# Verify configuration without making a request
+CommitCraft --dry-run --provider ollama --host http://remote-server:11434
+
+# Check if diff is too large
+git add .
+CommitCraft --dry-run  # See if token count exceeds your model's limit
+
+# Compare token usage across providers
+CommitCraft --dry-run --provider ollama
+CommitCraft --dry-run --provider google --model gemini-2.0-flash-exp
+```
+
+**Difference from `--confirm`:**
+
+- `--dry-run`: Shows statistics and **exits** (never generates a message)
+- `--confirm`: Shows statistics, **asks for confirmation**, then generates if confirmed
+
+#### Two-Step Confirmation (`--confirm`)
+
+The `--confirm` flag enables a two-step process that shows you a preview of the configuration and token usage before making an API call to generate the commit message. This is particularly useful when:
+
+- Working with paid/remote LLM providers to review costs before committing
+- Using git hooks where you want control over when API calls are made
+- Testing configuration changes before making actual API requests
+- Working with large diffs to see token counts first
+
+**Default Behavior (no confirmation):**
+```bash
+CommitCraft
+# Immediately generates commit message
+# Output: ✨ Add user authentication system
+```
+
+**With `--confirm`:**
+```bash
+CommitCraft --confirm
+# Step 1: Shows preview table with:
+#   Token Count: 1390
+#   System Prompt Tokens: 156
+#   User Prompt Tokens: 1234
+#   Model: qwen3
+#   Provider: ollama
+#   Host: http://localhost:11434
+#
+# Step 2: Prompts for confirmation
+# Proceed with commit message generation? (y/n): y
+#
+# Then generates commit message
+# Output: ✨ Add user authentication system
+```
+
+**Via Environment Variable:**
+```bash
+COMMITCRAFT_CONFIRM=1 CommitCraft
+```
+
+**In Git Hooks:**
+
+You can enable confirmation mode in git hooks in two ways:
+
+**1. Install hook with --confirm flag (permanent):**
+```bash
+# Local repository
+CommitCraft hook --confirm
+
+# Global (for all new repositories)
+CommitCraft hook --global --confirm
+```
+
+**2. Use environment variable (per-commit):**
+```bash
+# Enable confirmation for a single commit
+COMMITCRAFT_CONFIRM=1 git commit
+
+# Or set it for your shell session
+export COMMITCRAFT_CONFIRM=1
+git commit  # Will use confirmation mode
+```
+
+When confirmation mode is enabled (either way), every commit will:
+
+1. Show the commit type prompt (if interactive mode)
+2. Display dry-run statistics (token usage, model, provider, host)
+3. Ask "Proceed with commit message generation?"
+4. Generate the message only if confirmed
+
+**Canceling:**
+
+If you choose "no" at the confirmation prompt, CommitCraft exits gracefully without making any API calls or charges.
+
+**Combining with Other Flags:**
+
+```bash
+# Confirm + specific provider
+CommitCraft --confirm --provider openai --model gpt-4
+
+# Confirm + custom temperature
+COMMITCRAFT_CONFIRM=1 COMMITCRAFT_TEMPERATURE=0.8 CommitCraft
+
+# Confirm + bug fix hint
+CommitCraft --confirm --bug-desc "Fixed authentication timeout"
+```
+
+**Use Cases:**
+
+1. **Cost Control:** Review token usage before expensive API calls
+   ```bash
+   CommitCraft --confirm --provider openai --model gpt-4
+   ```
+
+2. **Hook Safety:** Install hooks with confirmation to avoid surprise API calls
+   ```bash
+   CommitCraft hook --confirm
+   ```
+
+3. **Configuration Testing:** Verify settings before committing
+   ```bash
+   CommitCraft --confirm --provider ollama --host http://remote-server:11434
+   ```
+
+4. **Large Diffs:** Check token count on large changesets
+   ```bash
+   # Stage 100+ files
+   git add .
+   CommitCraft --confirm  # See token count before proceeding
+   ```
+
 ---
 
 ## Subcommands
@@ -167,6 +377,7 @@ When installed, running `git commit` will automatically generate a message and p
 | `--global` | `-g` | Install as a **global** git hook template for all *new* repositories. |
 | `--uninstall` | `-u` | Remove the CommitCraft hook from the current (or global) repository. |
 | `--no-interactive` | | Disable the interactive prompts during commit. |
+| `--confirm` | | Enable two-step confirmation in the hook (shows dry-run preview before generating). |
 
 #### Skipping the Hook
 
@@ -236,6 +447,8 @@ CommitCraft respects environment variables for most of its configuration options
     *   `COMMITCRAFT_PROVIDER`: Overrides the default provider.
     *   `COMMITCRAFT_TEMPERATURE`: Overrides the model temperature.
     *   `COMMITCRAFT_HOST`: Overrides the host for API calls.
+    *   `COMMITCRAFT_CONFIRM`: Enables two-step confirmation mode (set to `1` or `true`).
+    *   `COMMITCRAFT_NO_EMOJI`: Disables emoji in commit messages (set to `1` or `true`).
 
 This method is especially useful for one-off commits where specific model behavior is desired.
 

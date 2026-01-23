@@ -2,6 +2,10 @@
 
 CommitCraft is a tool designed to enhance your commit messages by leveraging Large Language Models (LLMs). It provides an intuitive interface that simplifies the process of generating better, more informative commit messages based on staged changes in your git repository.
 
+**Doesn't every code editor, CLI, git helper and toaster have this feature?**
+
+Well, yeah. But CommitCraft is built specifically for **git CLI users**, focusing on features useful to them. It's designed to be as customizable as possible while providing sensible defaults. It might not be unique, but it is certainly opinionated. Do as you wish with it.
+
 ## Features
 
 - **Provider Agnostic**: Supports multiple LLM providers including Ollama, Ollama Cloud, Google, OpenAI, Groq, and any OpenAI-compatible endpoint.
@@ -34,6 +38,47 @@ The installation includes all supported providers (Ollama, OpenAI, Groq, and Goo
 
 **Note:** CommitCraft has migrated from Poetry to `uv` for dependency management. Development now uses `uv sync` and `uv run` commands.
 
+## Updating CommitCraft
+
+### Automatic Update Notifications
+
+CommitCraft automatically checks for updates weekly (opt-out by default) to help you stay current with security patches and new features. When a new version is available, you'll see a notification after generating commit messages or when managing hooks.
+
+**To disable automatic checks**, add this to your config file:
+```toml
+[updates]
+check_enabled = false
+```
+
+You can also configure the check interval (in days):
+```toml
+[updates]
+check_enabled = true
+check_interval_days = 14  # Check every 2 weeks
+```
+
+### Manual Updates
+
+To update CommitCraft to the latest version:
+
+```bash
+# Using uv (recommended)
+uv tool upgrade commitcraft
+
+# Using pipx
+pipx upgrade commitcraft
+```
+
+**Check your installed version:**
+```bash
+CommitCraft --version
+```
+
+**Notes:**
+- `uv tool upgrade` respects version constraints from the original installation
+- To force a specific version: `uv tool install commitcraft==<version>` or `pipx install commitcraft==<version> --force`
+- After updating, if you have git hooks installed, update them by running the same hook installation command (e.g., `CommitCraft hook` or `CommitCraft hook --global`)
+
 ## Quick Start
 
 ### Interactive Configuration (Recommended)
@@ -57,17 +102,25 @@ Set up automatic commit message generation with git hooks:
 ```bash
 # Install hook for current repository (interactive mode - default)
 CommitCraft hook
-
+```
+```bash
 # Install hook globally for all new repositories
 CommitCraft hook --global
-
-# Install in non-interactive mode (no prompts)
+```
+```bash
+# Install in non-interactive mode (no prompts for clues)/ go straight to the message
 CommitCraft hook --no-interactive
-
+```
+```bash
+# Install with confirm (token count before confirming the message generation)
+CommitCraft hook --confirm
+```
+```bash
 # Remove the hook (local)
 CommitCraft unhook
 # Or equivalently: CommitCraft hook --uninstall
-
+```
+```bash
 # Remove global hook
 CommitCraft unhook --global
 ```
@@ -167,7 +220,7 @@ You may pipe the output to other commands.
 ### Command-Line Arguments
 
 #### Model Configuration
-- `--provider`: Specifies the LLM provider (e.g., `ollama`, `ollama_cloud`, `google`, `openai`, `groq`, `openai_compatible`).
+- `--provider`: Specifies the LLM provider (e.g., `ollama`, `ollama_cloud`, `google`, `anthropic`, `openai`, `groq`, `openai_compatible`).
 - `--model`: The name of the model to use.
 - `--config-file`: Path to a configuration file.
 - `--system-prompt`: A system prompt to guide the LLM.
@@ -179,6 +232,7 @@ You may pipe the output to other commands.
 
 #### CommitClues (Context Hints)
 Give the AI more context about your changes:
+
 - `--bug` / `--bug-desc "description"`: Indicate this commit fixes a bug
 - `--feat` / `--feat-desc "description"`: Indicate this commit adds a feature
 - `--docs` / `--docs-desc "description"`: Indicate this commit updates documentation
@@ -192,6 +246,8 @@ Give the AI more context about your changes:
 - `--ignore`: Files or patterns to exclude from the diff (comma-separated)
 - `--debug-prompt`: Display the prompt without sending it to the LLM (useful for debugging)
 - `--no-color` / `-p` / `--plain`: Disable colored output (for piping or scripting)
+- `--dry-run` : Return the number of tokens it would use in the current status of the repo (added files) and model / provider
+- `--confirm` : run a dry-run summary then ask the user to confirm the request
 
 **Example:**
 ```bash
@@ -227,7 +283,7 @@ temperature = 0.7
 max_tokens = 1000
 
 [emoji]
-emoji_steps = "single"  # Options: "single", "2-step", or false
+emoji_steps = "single"  # Options: "single" or false (2-step planned for v1.2)
 emoji_convention = "simple"  # Options: "simple", "full", or custom string
 
 # Named provider profiles (optional - allows multiple provider configurations)
@@ -307,10 +363,23 @@ COMMITCRAFT_MAX_CONTEXT_SIZE=128000
 ```
 
 **Hook Control:**
+
 ```sh
-# Skip CommitCraft hook for a single commit
+# Skip CommitCraft hook
 COMMITCRAFT_SKIP=1 git commit
 ```
+
+```sh
+# dry run then confirm
+COMMITCRAFT_CONFIRM=1 git commit
+```
+
+```sh
+# select non default provider and model
+COMMITCRAFT_PROVIDER=google COMMITCRAFT_MODEL=gemini-2.5-pro git commit
+```
+
+Combine settings as you wish.
 
 **Named Provider Profiles:**
 
@@ -366,7 +435,7 @@ CommitCraft --provider openai_compatible --model deepseek-chat --host https://ap
 
 ## Privacy
 
-CommitCraft itself does not log, record or send any information about your usage and project, or any other info. 
+CommitCraft itself does not log, record or send any information about your usage and project, or any other info. Besides the provider the only other request it makes is to to pypi to check for updates and this can be opt-out.
 
 However, it is important to note that by using CommitCraft, you are agreeing to the terms of the providers you choose, as CommitCraft sends diffs and contextual information to their API. Unless you self-host the application, these providers may still collect your request history and metadata information. For more detailed information about how each provider handles your data, please review their respective privacy policies:
 
@@ -427,4 +496,4 @@ This project is licensed under the AGPL 3.0 License - see the [LICENSE](https://
 
 ---
 
-Thank you for using CommitCraft! We hope this tool helps you craft better commit messages effortlessly.  
+Thank you for using CommitCraft! We hope this tool helps you craft better commit messages effortlessly.
