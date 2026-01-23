@@ -211,6 +211,7 @@ def format_update_notification(update_info: dict, no_color: bool = False) -> str
 ╰────────────────────────────────────────────────────╯
 """
     else:
+        # Use double backslash to escape the bracket for Rich markup
         return f"""
 [dim]╭────────────────────────────────────────────────────╮[/dim]
 [dim]│[/dim] [bold green]🎉 CommitCraft {latest} is available![/bold green]{" " * (22 - len(latest))}[dim]│[/dim]
