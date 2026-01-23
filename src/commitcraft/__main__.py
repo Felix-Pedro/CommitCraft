@@ -1,9 +1,9 @@
 import os
+import queue
 import random
 import re
 import threading
-import queue
-from typing import Optional, Any
+from typing import Any, Optional
 
 # Force color support by default (fixes zsh detection issues)
 # Use --no-color flag or NO_COLOR=1 environment variable to disable
@@ -27,8 +27,10 @@ from commitcraft import (
     filter_diff,
     get_diff,
 )
+
 from .config_handler import interactive_config
 from .messages import LOADING_MESSAGES
+from .update_checker import check_and_notify_update
 
 # Default patterns to ignore in diffs (these files add noise without useful context)
 DEFAULT_IGNORE_PATTERNS = [
@@ -92,7 +94,7 @@ app = typer.Typer(rich_markup_mode="rich")
 
 def rotating_status(callable_func, *args, **kwargs):
     """
-    Execute a function with a rotating loading message that changes every 3 seconds.
+    Execute a function with a rotating loading message that changes every 4 seconds.
     Safely handles threading and exceptions.
     """
     # Use a Queue for thread-safe result/exception passing
@@ -124,8 +126,8 @@ def rotating_status(callable_func, *args, **kwargs):
         refresh_per_second=10,
     ) as live:
         while not finished.is_set():
-            # Wait for 3 seconds or until finished
-            if finished.wait(timeout=3.0):
+            # Wait for 4 seconds or until finished
+            if finished.wait(timeout=4.0):
                 break
 
             # Rotate to next message
@@ -719,6 +721,10 @@ def main(
 
         typer.echo(response)
 
+        # Check for updates after successful commit message generation
+        # Only check if not in dry-run mode and not using --version or --help
+        check_and_notify_update(config=config, no_color=(no_color or plain))
+
 
 @app.command("init")
 def init():
@@ -865,6 +871,9 @@ def _install_hook(global_hook: bool, interactive: bool = True, confirm: bool = F
     import subprocess
     from pathlib import Path
 
+    # Check for updates when installing/updating hooks
+    check_and_notify_update()
+
     if global_hook:
         # Get git template directory
         try:
@@ -978,6 +987,15 @@ if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unk
     echo "" >&2
 fi
 
+# Check for CommitCraft updates (weekly, non-blocking)
+python3 -c "
+try:
+    from commitcraft.update_checker import check_and_notify_update
+    check_and_notify_update(no_color=False)
+except Exception:
+    pass
+" 2>/dev/null || true
+
 # Skip if COMMITCRAFT_SKIP is set
 if [ -n "$COMMITCRAFT_SKIP" ]; then
     exit 0
@@ -1017,7 +1035,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
         s|S)
             # User wants to skip and write manually
             exit 0
-            ;; 
+            ;;
         b|B)
             printf "Describe the bug fix (optional): "
             read -r BUG_DESC
@@ -1027,7 +1045,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--bug"
             fi
-            ;; 
+            ;;
         f|F)
             printf "Describe the feature (optional): "
             read -r FEAT_DESC
@@ -1037,7 +1055,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--feat"
             fi
-            ;; 
+            ;;
         d|D)
             printf "Describe the documentation change (optional): "
             read -r DOCS_DESC
@@ -1047,7 +1065,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--docs"
             fi
-            ;; 
+            ;;
         r|R)
             printf "Describe the refactoring (optional): "
             read -r REFACT_DESC
@@ -1057,7 +1075,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
             else
                 COMMITCRAFT_ARGS="--refact"
             fi
-            ;; 
+            ;;
         *)
             # No specific type, use default
             ;;
@@ -1079,12 +1097,12 @@ if [ -z "$COMMIT_SOURCE" ]; then
     if [ -n "$ENABLE_CONFIRMATION" ]; then
         # Unset COMMITCRAFT_CONFIRM to prevent CLI from showing its own confirmation
         unset COMMITCRAFT_CONFIRM
-        
+
         echo "" >&2
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
         echo "  Dry-Run Preview (Confirmation Mode)" >&2
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-        
+
         # Run dry-run to show token usage
         if [ -n "$COMMITCRAFT_DESC" ]; then
             CommitCraft --dry-run $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC" >&2
@@ -1093,11 +1111,11 @@ if [ -z "$COMMIT_SOURCE" ]; then
         else
             CommitCraft --dry-run >&2
         fi
-        
+
         echo "" >&2
         printf "Proceed with commit message generation? (Y/n): " >&2
         read -r CONFIRM_RESPONSE
-        
+
         case "$CONFIRM_RESPONSE" in
             [Nn]|[Nn][Oo])
                 echo "Cancelled by user." >&2
@@ -1108,7 +1126,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
     fi
 
     # Generate commit message with CommitCraft (without --confirm flag)
-    
+
     # Pass description as a separate argument to avoid quoting issues
     if [ -n "$COMMITCRAFT_DESC" ]; then
         GENERATED_MSG=$(CommitCraft $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC")
@@ -1149,6 +1167,15 @@ if [ "$HOOK_VERSION" != "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "unk
     echo "" >&2
 fi
 
+# Check for CommitCraft updates (weekly, non-blocking)
+python3 -c "
+try:
+    from commitcraft.update_checker import check_and_notify_update
+    check_and_notify_update(no_color=False)
+except Exception:
+    pass
+" 2>/dev/null || true
+
 # Skip if COMMITCRAFT_SKIP is set
 if [ -n "$COMMITCRAFT_SKIP" ]; then
     exit 0
@@ -1177,22 +1204,22 @@ if [ -z "$COMMIT_SOURCE" ]; then
     if [ -n "$ENABLE_CONFIRMATION" ]; then
         # Redirect input from terminal to make read work in git hook
         exec < /dev/tty
-        
+
         # Unset COMMITCRAFT_CONFIRM to prevent CLI from showing its own confirmation
         unset COMMITCRAFT_CONFIRM
-        
+
         echo "" >&2
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
         echo "  Dry-Run Preview (Confirmation Mode)" >&2
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-        
+
         # Run dry-run to show token usage
         CommitCraft --dry-run >&2
-        
+
         echo "" >&2
         printf "Proceed with commit message generation? (Y/n): " >&2
         read -r CONFIRM_RESPONSE
-        
+
         case "$CONFIRM_RESPONSE" in
             [Nn]|[Nn][Oo])
                 echo "Cancelled by user." >&2
@@ -1203,7 +1230,7 @@ if [ -z "$COMMIT_SOURCE" ]; then
     fi
 
     # Generate commit message with CommitCraft (without --confirm flag)
-    
+
     # stderr goes to terminal (shows loading spinner), stdout captured
     GENERATED_MSG=$(CommitCraft)
 
