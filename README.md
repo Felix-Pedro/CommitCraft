@@ -1,5 +1,14 @@
  # CommitCraft
 
+![CI](https://github.com/Felix-Pedro/CommitCraft/workflows/CI/badge.svg?branch=main) 
+[![PyPI version](https://img.shields.io/pypi/v/commitcraft.svg)](https://pypi.org/project/commitcraft/)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://felix-pedro.github.io/CommitCraft/)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/commitcraft)
+![GitHub Repo stars](https://img.shields.io/github/stars/Felix-Pedro/CommitCraft?style=social)
+![GitHub contributors](https://img.shields.io/github/contributors/Felix-Pedro/CommitCraft)
+
 CommitCraft is a tool designed to enhance your commit messages by leveraging Large Language Models (LLMs). It provides an intuitive interface that simplifies the process of generating better, more informative commit messages based on staged changes in your git repository.
 
 **Doesn't every code editor, CLI, git helper and toaster have this feature?**
