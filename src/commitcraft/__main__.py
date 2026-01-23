@@ -21,6 +21,7 @@ from typing_extensions import Annotated
 from commitcraft import (
     CommitCraftInput,
     EmojiConfig,
+    EmojiSteps,
     LModel,
     LModelOptions,
     commit_craft,
@@ -476,6 +477,15 @@ def main(
             help="Enable two-step confirmation: show dry-run info and settings, then ask for confirmation before generating",
         ),
     ] = False,
+    no_emoji: Annotated[
+        bool,
+        typer.Option(
+            rich_help_panel="Model Config",
+            envvar="COMMITCRAFT_NO_EMOJI",
+            is_flag=True,
+            help="Disable emoji in commit messages (overrides config emoji settings)",
+        ),
+    ] = False,
 ):
     """
     [bold green]Generates a commit message[/bold green] based on the result of [cyan]git diff --staged -M[/cyan] and your clues, via the LLM you choose.
@@ -544,11 +554,19 @@ def main(
             }
         )
 
-        emoji_config = (
-            EmojiConfig(**config.get("emoji"))
-            if config.get("emoji")
-            else EmojiConfig(emoji_steps="single", emoji_convention="simple")
-        )
+        # Handle emoji configuration - CLI --no-emoji flag overrides config
+        if no_emoji:
+            emoji_config = EmojiConfig(
+                emoji_steps=EmojiSteps.false, emoji_convention="simple"
+            )
+        else:
+            emoji_config = (
+                EmojiConfig(**config.get("emoji"))
+                if config.get("emoji")
+                else EmojiConfig(
+                    emoji_steps=EmojiSteps.single, emoji_convention="simple"
+                )
+            )
 
         # Determine model config
         providers_map = config.get("providers", {})
