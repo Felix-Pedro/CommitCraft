@@ -1104,12 +1104,6 @@ if [ -z "$COMMIT_SOURCE" ]; then
     if [ -n "$COMMITCRAFT_CONFIRM" ]; then
         ENABLE_CONFIRMATION="1"
     fi
-    # Check if hook was installed with --confirm
-    case "{commitcraft_base_cmd}" in
-        *--confirm*)
-            ENABLE_CONFIRMATION="1"
-            ;;
-    esac
 
     # If confirmation is enabled, show dry-run first and ask for confirmation
     if [ -n "$ENABLE_CONFIRMATION" ]; then
