@@ -375,7 +375,7 @@ def commit_craft(
     input_data = clue_parser(input)
     user_prompt = input_template.render(**input_data)
 
-    # Add emoji guidelines to system prompt if enabled
+    # Add emoji guidelines to system prompt if enabled, or explicit no-emoji instruction if disabled
     if emoji and emoji.emoji_steps == EmojiSteps.single:
         if emoji.emoji_convention in ("simple", "full"):
             emoji_guide = default.get("emoji_guidelines", {}).get(
@@ -384,6 +384,9 @@ def commit_craft(
             system_prompt += f"\n\n{emoji_guide}"
         elif emoji.emoji_convention:
             system_prompt += f"\n\n{emoji.emoji_convention}"
+    elif emoji and emoji.emoji_steps == EmojiSteps.false:
+        # Explicitly instruct the model NOT to use emojis
+        system_prompt += "\n\nIMPORTANT: Do NOT include any emojis in the commit message. Use plain text only."
 
     # Debug mode: return prompts without calling LLM
     if debug_prompt:
