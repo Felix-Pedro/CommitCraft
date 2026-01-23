@@ -64,17 +64,19 @@ class TestGoogleProvider:
         # Execute
         result = provider.calculate_usage("System prompt", "User prompt")
 
-        # Verify
-        assert result["token_count"] == 100
+        # Verify - should be 200 since count_tokens is called twice (system + user)
+        assert result["token_count"] == 200
 
-        # Check call arguments
-        args, kwargs = mock_client.models.count_tokens.call_args
-        assert kwargs["model"] == "models/gemini-pro"
-        # Verify contents has both prompts
-        assert kwargs["contents"] == ["System prompt", "User prompt"]
+        # Check that count_tokens was called twice
+        assert mock_client.models.count_tokens.call_count == 2
 
-        # Verify no config is passed for system instruction (since it's in contents)
-        assert "config" not in kwargs
+        # Verify both calls used correct model
+        calls = mock_client.models.count_tokens.call_args_list
+        assert all(call.kwargs["model"] == "models/gemini-pro" for call in calls)
+
+        # Verify each prompt was counted separately
+        assert calls[0].kwargs["contents"] == ["System prompt"]
+        assert calls[1].kwargs["contents"] == ["User prompt"]
 
     def test_generate_uses_generate_content_config(self, mock_google_modules):
         """Verify that generate uses GenerateContentConfig."""
@@ -128,15 +130,18 @@ class TestOpenAICompatibleProviderGemini:
             # Execute
             result = provider.calculate_usage("System prompt", "User prompt")
 
-            # Verify
-            assert result["token_count"] == 150
+            # Verify - should be 300 since count_tokens is called twice (system + user)
+            assert result["token_count"] == 300
 
-            # Check call arguments
-            args, kwargs = mock_client.models.count_tokens.call_args
-            assert kwargs["model"] == "models/gemini-1.5-pro"
+            # Check that count_tokens was called twice
+            assert mock_client.models.count_tokens.call_count == 2
 
-            # Verify contents has both prompts
-            assert kwargs["contents"] == ["System prompt", "User prompt"]
+            # Verify both calls used correct model
+            calls = mock_client.models.count_tokens.call_args_list
+            assert all(
+                call.kwargs["model"] == "models/gemini-1.5-pro" for call in calls
+            )
 
-            # Verify no config is passed for system instruction
-            assert "config" not in kwargs
+            # Verify each prompt was counted separately
+            assert calls[0].kwargs["contents"] == ["System prompt"]
+            assert calls[1].kwargs["contents"] == ["User prompt"]

@@ -110,9 +110,9 @@ class TestAnthropicProvider:
         # Execute
         result = provider.calculate_usage("System", "User")
 
-        # Verify
-        assert result["token_count"] == 42
-        mock_client.messages.count_tokens.assert_called_once()
+        # Verify - should be 84 since count_tokens is called twice (system + user)
+        assert result["token_count"] == 84
+        assert mock_client.messages.count_tokens.call_count == 2
 
 
 class TestGroqProvider:
@@ -172,7 +172,8 @@ class TestOllamaProvider:
         with patch.object(provider, "_count_tokens", return_value=100):
             result = provider.calculate_usage("System", "User")
 
-        assert result["token_count"] == 100
+        # Should be 200 since _count_tokens is called twice (system + user), each returning 100
+        assert result["token_count"] == 200
         assert "context_size" in result
 
 
