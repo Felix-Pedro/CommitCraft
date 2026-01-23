@@ -172,6 +172,83 @@ system_prompt = "You are a pirate software engineer. Write commit messages in a 
 
 ## Advanced Git Hook Workflows
 
+### Two-Step Confirmation for Hooks
+
+When using CommitCraft in a git hook, you might want to review the configuration and token usage before actually making an API call to generate the commit message. The `--confirm` flag enables this workflow.
+
+**Install hook with confirmation mode:**
+
+```bash
+# Local repository
+CommitCraft hook --confirm
+
+# Global (all new repos)
+CommitCraft hook --global --confirm
+
+# Interactive + confirmation
+CommitCraft hook --confirm  # Default is interactive
+```
+
+**Workflow with confirmation enabled:**
+
+1. Stage your changes: `git add .`
+2. Run: `git commit`
+3. **Interactive prompt appears** (if interactive mode):
+   ```
+   CommitCraft: What type of commit is this?
+     [b] Bug fix
+     [f] Feature
+     [d] Documentation
+     [r] Refactoring
+     [n] None
+     [s] Skip
+   Your choice: f
+   Describe the feature (optional): Added dark mode
+   ```
+4. **Dry-run preview shows**:
+   ```
+   ┌─────────────────────────────┬────────────────────────────┐
+   │ Metric                      │ Value                      │
+   ├─────────────────────────────┼────────────────────────────┤
+   │ Token Count                 │ 1390                       │
+   │ System Prompt Tokens        │ 156                        │
+   │ User Prompt Tokens          │ 1234                       │
+   │ Model                       │ qwen3                      │
+   │ Provider                    │ ollama                     │
+   │ Host                        │ http://localhost:11434     │
+   └─────────────────────────────┴────────────────────────────┘
+   ```
+5. **Confirmation prompt**:
+   ```
+   Proceed with commit message generation? (Y/n): y
+   ```
+6. **Message generated** and editor opens with AI-generated commit message
+
+**Why use confirmation in hooks?**
+
+- **Cost Control:** Review token usage before paid API calls (OpenAI, Anthropic, Groq)
+- **Context Awareness:** See exactly what will be sent to the LLM
+- **Large Diffs:** Verify token count on large changesets before proceeding
+- **Configuration Testing:** Ensure correct model/provider before generating
+
+**Enabling/Disabling confirmation per-commit:**
+
+You can control confirmation mode on a per-commit basis using environment variables:
+
+```bash
+# Enable confirmation for a single commit (even without --confirm hook)
+COMMITCRAFT_CONFIRM=1 git commit
+
+# Disable confirmation for a single commit (even with --confirm hook)
+COMMITCRAFT_CONFIRM= git commit  # Empty value disables it
+
+# Skip CommitCraft entirely for this commit
+COMMITCRAFT_SKIP=1 git commit
+
+# Provide your own message (auto-skips)
+git commit -m "quick fix"
+```
+
 ### Skipping the Hook
 Sometimes you just want to write a quick message without AI assistance.
 
@@ -187,6 +264,122 @@ git commit
 # > What type of commit is this?
 # > [s] Skip (write message manually)
 # Your choice: s
+```
+
+### Cost Control and Token Management
+
+When using paid LLM providers (OpenAI, Anthropic, Groq), it's important to be aware of token usage to control costs. CommitCraft provides several features to help.
+
+**1. Dry-Run Mode (Check Tokens Without Generating):**
+
+The `--dry-run` flag shows token usage statistics **without** making an API call:
+
+```bash
+# See token count without making API call
+CommitCraft --dry-run
+
+# Example output for Ollama:
+# ┌──────────────────────┬──────────────────────────────┐
+# │ Metric               │ Value                        │
+# ├──────────────────────┼──────────────────────────────┤
+# │ Token Count          │ 2579                         │
+# │ System Prompt Tokens │ 234                          │
+# │ User Prompt Tokens   │ 2345                         │
+# │ Model                │ qwen3                        │
+# │ Provider             │ ollama                       │
+# │ Host                 │ http://localhost:11434       │
+# │ Context Size         │ 3869                         │
+# │ Context Utilization  │ 66.7%                        │
+# └──────────────────────┴──────────────────────────────┘
+
+# Example output for OpenAI/Google/Anthropic/Groq:
+# ┌──────────────────────┬──────────────────────┐
+# │ Metric               │ Value                │
+# ├──────────────────────┼──────────────────────┤
+# │ Token Count          │ 2579                 │
+# │ System Prompt Tokens │ 234                  │
+# │ User Prompt Tokens   │ 2345                 │
+# │ Model                │ gpt-4                │
+# │ Provider             │ openai               │
+# └──────────────────────┴──────────────────────┘
+```
+
+**Note:** Dry-run **exits immediately** after showing statistics. Use `--confirm` if you want to generate after reviewing.
+
+**2. Confirmation Mode (Review Before Generating):**
+
+```bash
+# Shows dry-run stats, then asks for confirmation
+CommitCraft --confirm --provider openai --model gpt-4
+
+# Step 1: Shows token preview
+# Step 2: Prompts "Proceed with commit message generation? (Y/n)"
+```
+
+**3. Ignore Large Files to Reduce Tokens:**
+
+Create `.commitcraft/.ignore` to exclude files that add noise:
+
+```bash
+# Generate default ignore file
+CommitCraft config --generate-ignore
+
+# Add custom patterns
+echo "*.svg" >> .commitcraft/.ignore
+echo "dist/*" >> .commitcraft/.ignore
+echo "build/*" >> .commitcraft/.ignore
+```
+
+**4. Use Local Models for Development:**
+
+Use free local models (Ollama) during development, paid models for important commits:
+
+```bash
+# Development: Free local model
+CommitCraft --provider ollama --model qwen3
+
+# Production release: Paid high-quality model
+CommitCraft --confirm --provider openai --model gpt-4 --feat-desc "v2.0 release"
+```
+
+**5. Set Token Limits:**
+
+```bash
+# Limit output tokens (commit message length)
+CommitCraft --max-tokens 150
+
+# Or in config file
+[models.options]
+max_tokens = 150
+```
+
+**6. Monitor Usage with Aliases:**
+
+Create shell aliases for different use cases:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+alias cc-check="CommitCraft --dry-run"
+alias cc-cheap="CommitCraft --provider ollama --model qwen3"
+alias cc-premium="CommitCraft --confirm --provider openai --model gpt-4"
+```
+
+**Example Workflow:**
+
+```bash
+# 1. Check token usage first
+CommitCraft --dry-run --provider openai --model gpt-4
+# Output shows 5000 tokens (might be expensive)
+
+# 2. Reduce tokens by ignoring files
+echo "package-lock.json" >> .commitcraft/.ignore
+
+# 3. Check again
+CommitCraft --dry-run --provider openai --model gpt-4
+# Output shows 1500 tokens (much better!)
+
+# 4. Generate with confirmation
+CommitCraft --confirm --provider openai --model gpt-4
 ```
 
 ### Chaining with `pre-commit`

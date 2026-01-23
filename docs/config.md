@@ -182,7 +182,7 @@ CommitCraft supports GitMoji conventions to add emojis to your commit messages. 
 
 ```toml
 [emoji]
-emoji_steps = "single"      # Options: "single", "2-step", or false
+emoji_steps = "single"      # Options: "single", false (2-step TBD in v1.2)
 emoji_convention = "simple"  # Options: "simple", "full", or custom string
 ```
 
@@ -192,9 +192,9 @@ Controls how emojis are generated:
 
 - **`"single"`** (default): The AI generates the commit message and emoji in one step. The emoji guidelines are appended to the system prompt, and the model chooses the appropriate emoji while writing the commit message.
 
-- **`"2-step"`**: First generates the commit message without emoji, then in a second AI call, selects the appropriate emoji based on the message. This uses more API calls but may provide more consistent emoji selection.
-
 - **`false`**: Disables emoji generation entirely. Commit messages will not include emojis.
+
+- **`"2-step"`** (TBD v1.2): Will generate the commit message without emoji first, then in a second AI call, select the appropriate emoji based on the message. This feature is planned for version 1.2.
 
 #### `emoji_convention`
 
@@ -242,14 +242,14 @@ Example output:
 
 ### CLI Override
 
-You can disable emojis for a single commit using the `--no-emoji` flag (if implemented), or by setting `emoji_steps = false` in your configuration.
+You can disable emojis for a single commit using the `--no-emoji` flag, or by setting `emoji_steps = false` in your configuration.
 
 ### Best Practices
 
 - **Use `"simple"`** for general projects - it covers 95% of common commit types
 - **Use `"full"`** if your project has specific needs (CI/CD, infrastructure, analytics)
 - **Use `"single"` step** for faster generation and lower API costs
-- **Use `"2-step"`** if you find emoji selection inconsistent with your provider
+- **`"2-step"` emoji mode** - TBD in version 1.2 (currently only `"single"` and `false` are fully implemented)
 
 ---
 

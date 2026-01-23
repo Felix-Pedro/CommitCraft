@@ -46,7 +46,8 @@ def commit_craft(
     context: dict[str, str] = {},
     emoji: Optional[EmojiConfig] = None,
     debug_prompt: bool = False,
-) -> str
+    dry_run: bool = False,
+) -> str | dict
 ```
 
 **Parameters:**
@@ -58,8 +59,12 @@ def commit_craft(
 | `context` | `dict[str, str]` | ❌ | Context variables for prompt templates |
 | `emoji` | `EmojiConfig \| None` | ❌ | Emoji configuration |
 | `debug_prompt` | `bool` | ❌ | If True, returns prompt without calling AI |
+| `dry_run` | `bool` | ❌ | If True, returns token usage statistics without generating message |
 
-**Returns:** `str` - Generated commit message
+**Returns:** 
+- `str` - Generated commit message (when `debug_prompt=False` and `dry_run=False`)
+- `str` - Prompt text (when `debug_prompt=True`)
+- `dict` - Token usage statistics (when `dry_run=True`)
 
 **Example:**
 ```python
@@ -93,6 +98,23 @@ message = commit_craft(
     context=context,
     emoji=emoji_config
 )
+
+# Or get token usage without generating
+usage_stats = commit_craft(
+    input=input_data,
+    models=model,
+    context=context,
+    emoji=emoji_config,
+    dry_run=True
+)
+# Returns: {
+#   'provider': 'openai',
+#   'model': 'gpt-4',
+#   'input_tokens': 1234,
+#   'system_prompt_tokens': 156,
+#   'total_tokens': 1390,
+#   'host': 'https://api.openai.com'
+# }
 ```
 
 ---
@@ -589,6 +611,8 @@ CommitCraft integrates with git hooks via the `prepare-commit-msg` hook. When in
 | Variable | Description | Example |
 | :--- | :--- | :--- |
 | `COMMITCRAFT_SKIP` | Skip CommitCraft hook for a single commit | `COMMITCRAFT_SKIP=1 git commit` |
+| `COMMITCRAFT_CONFIRM` | Enable two-step confirmation mode (works in hooks even without --confirm flag) | `COMMITCRAFT_CONFIRM=1 git commit` |
+| `COMMITCRAFT_NO_EMOJI` | Disable emoji in commit messages (overrides config) | `COMMITCRAFT_NO_EMOJI=1 CommitCraft` |
 
 ### Hook Behavior
 
@@ -608,6 +632,13 @@ CommitCraft hook
 # Install local hook (non-interactive)
 CommitCraft hook --no-interactive
 
+# Install with two-step confirmation (permanent)
+CommitCraft hook --confirm
+
+# Or use environment variable for per-commit confirmation
+# (works with any hook, even without --confirm flag)
+COMMITCRAFT_CONFIRM=1 git commit
+
 # Install global hook
 CommitCraft hook --global
 
@@ -617,6 +648,80 @@ CommitCraft unhook
 
 # Uninstall global hook
 CommitCraft unhook --global
+```
+
+### Dry-Run and Confirmation Modes
+
+CommitCraft provides two modes for previewing token usage before making API calls:
+
+**1. Dry-Run Mode (`dry_run=True`):**
+
+Shows token usage statistics without generating a message:
+
+```python
+from commitcraft import commit_craft, CommitCraftInput, LModel, Provider
+
+input_data = CommitCraftInput(diff=get_diff())
+model = LModel(provider=Provider.openai, model="gpt-4")
+
+# Get token usage stats
+stats = commit_craft(input=input_data, models=model, dry_run=True)
+
+print(f"Provider: {stats['provider']}")
+print(f"Model: {stats['model']}")
+print(f"Token Count: {stats['token_count']}")
+print(f"System Prompt Tokens: {stats['system_prompt_tokens']}")
+print(f"User Prompt Tokens: {stats['user_prompt_tokens']}")
+```
+
+**2. Two-Step Confirmation (CLI only):**
+
+When using the CLI with `--confirm` flag or `COMMITCRAFT_CONFIRM=1` environment variable, CommitCraft:
+
+1. Shows dry-run statistics
+2. Prompts for user confirmation
+3. Generates message only if confirmed
+
+This mode is useful for:
+- Cost control with paid providers
+- Reviewing configuration before API calls
+- Git hooks where you want explicit control
+
+**Example Integration:**
+
+```python
+#!/usr/bin/env python3
+"""
+Script that mimics --confirm behavior in Python.
+"""
+from commitcraft import commit_craft, CommitCraftInput, LModel, get_diff
+
+def generate_with_confirmation():
+    diff = get_diff()
+    input_data = CommitCraftInput(diff=diff)
+    model = LModel(provider="openai", model="gpt-4")
+    
+    # Step 1: Show dry-run stats
+    stats = commit_craft(input=input_data, models=model, dry_run=True)
+    print("Token Usage Preview:")
+    for key, value in stats.items():
+        print(f"  {key}: {value}")
+    
+    # Step 2: Ask for confirmation
+    response = input("\nProceed with commit message generation? (y/n): ")
+    
+    if response.lower() in ('y', 'yes'):
+        # Step 3: Generate message
+        message = commit_craft(input=input_data, models=model)
+        return message
+    else:
+        print("Cancelled by user.")
+        return None
+
+if __name__ == "__main__":
+    message = generate_with_confirmation()
+    if message:
+        print(f"\nGenerated Message:\n{message}")
 ```
 
 ---
