@@ -508,15 +508,8 @@ def main(
 
     [bold yellow]API keys[/bold yellow] can be provided via environment variables or a [cyan].env[/cyan] file.
 
-    Supported environment variable names are:
-    • [cyan]OPENAI_API_KEY[/cyan]
-    • [cyan]GROQ_API_KEY[/cyan]
-    • [cyan]GOOGLE_API_KEY[/cyan]
-    • [cyan]OLLAMA_API_KEY[/cyan] (for [magenta]ollama_cloud[/magenta] or remote instances)
-    • [cyan]CUSTOM_API_KEY[/cyan] (for [magenta]openai_compatible[/magenta] provider)
-    • [cyan]NICKNAME_API_KEY[/cyan] (for named provider profiles, e.g., [dim]REMOTE_API_KEY[/dim])
-    • [cyan]OLLAMA_HOST[/cyan] (for [magenta]ollama[/magenta] provider, e.g., [dim]http://localhost:11434[/dim])
-    • [cyan]COMMITCRAFT_MIN_CONTEXT_SIZE[/cyan] / [cyan]COMMITCRAFT_MAX_CONTEXT_SIZE[/cyan] (for context limits)
+    For a complete list of supported environment variables, run:
+    [cyan]CommitCraft envvars[/cyan]
     """
     if ctx.invoked_subcommand is None:
         # Handle color output
@@ -1092,72 +1085,85 @@ if [ -z "$COMMIT_SOURCE" ]; then
         exit 0
     fi
 
-    # Interactive prompt for commit type
-    # Redirect input from terminal to make read work in git hook
-    exec < /dev/tty
-
-    echo "CommitCraft: What type of commit is this?"
-    echo "  [b] Bug fix"
-    echo "  [f] Feature"
-    echo "  [d] Documentation"
-    echo "  [r] Refactoring"
-    echo "  [n] None (no specific type)"
-    echo "  [s] Skip (write message manually)"
-    printf "Your choice (b/f/d/r/n/s) [n]: "
-    read -r COMMIT_TYPE
+    # Check if COMMITCRAFT_CLUE_PROMPT env var overrides the hook's interactive mode
+    # COMMITCRAFT_CLUE_PROMPT=1 or true: always prompt
+    # COMMITCRAFT_CLUE_PROMPT=0: never prompt
+    # Not set: use hook's installed mode (interactive in this script)
+    SHOULD_PROMPT_CLUES=1  # Default for interactive hook
+    if [ "$COMMITCRAFT_CLUE_PROMPT" = "0" ]; then
+        SHOULD_PROMPT_CLUES=0
+    elif [ "$COMMITCRAFT_CLUE_PROMPT" = "1" ] || [ "$COMMITCRAFT_CLUE_PROMPT" = "true" ]; then
+        SHOULD_PROMPT_CLUES=1
+    fi
 
     # Build CommitCraft arguments based on user input
     COMMITCRAFT_ARGS=""
 
-    case "$COMMIT_TYPE" in
-        s|S)
-            # User wants to skip and write manually
-            exit 0
-            ;;
-        b|B)
-            printf "Describe the bug fix (optional): "
-            read -r BUG_DESC
-            if [ -n "$BUG_DESC" ]; then
-                COMMITCRAFT_ARGS="--bug-desc"
-                COMMITCRAFT_DESC="$BUG_DESC"
-            else
-                COMMITCRAFT_ARGS="--bug"
-            fi
-            ;;
-        f|F)
-            printf "Describe the feature (optional): "
-            read -r FEAT_DESC
-            if [ -n "$FEAT_DESC" ]; then
-                COMMITCRAFT_ARGS="--feat-desc"
-                COMMITCRAFT_DESC="$FEAT_DESC"
-            else
-                COMMITCRAFT_ARGS="--feat"
-            fi
-            ;;
-        d|D)
-            printf "Describe the documentation change (optional): "
-            read -r DOCS_DESC
-            if [ -n "$DOCS_DESC" ]; then
-                COMMITCRAFT_ARGS="--docs-desc"
-                COMMITCRAFT_DESC="$DOCS_DESC"
-            else
-                COMMITCRAFT_ARGS="--docs"
-            fi
-            ;;
-        r|R)
-            printf "Describe the refactoring (optional): "
-            read -r REFACT_DESC
-            if [ -n "$REFACT_DESC" ]; then
-                COMMITCRAFT_ARGS="--refact-desc"
-                COMMITCRAFT_DESC="$REFACT_DESC"
-            else
-                COMMITCRAFT_ARGS="--refact"
-            fi
-            ;;
-        *)
-            # No specific type, use default
-            ;;
-    esac
+    if [ "$SHOULD_PROMPT_CLUES" = "1" ]; then
+        # Interactive prompt for commit type
+        # Redirect input from terminal to make read work in git hook
+        exec < /dev/tty
+
+        echo "CommitCraft: What type of commit is this?"
+        echo "  [b] Bug fix"
+        echo "  [f] Feature"
+        echo "  [d] Documentation"
+        echo "  [r] Refactoring"
+        echo "  [n] None (no specific type)"
+        echo "  [s] Skip (write message manually)"
+        printf "Your choice (b/f/d/r/n/s) [n]: "
+        read -r COMMIT_TYPE
+
+        case "$COMMIT_TYPE" in
+            s|S)
+                # User wants to skip and write manually
+                exit 0
+                ;;
+            b|B)
+                printf "Describe the bug fix (optional): "
+                read -r BUG_DESC
+                if [ -n "$BUG_DESC" ]; then
+                    COMMITCRAFT_ARGS="--bug-desc"
+                    COMMITCRAFT_DESC="$BUG_DESC"
+                else
+                    COMMITCRAFT_ARGS="--bug"
+                fi
+                ;;
+            f|F)
+                printf "Describe the feature (optional): "
+                read -r FEAT_DESC
+                if [ -n "$FEAT_DESC" ]; then
+                    COMMITCRAFT_ARGS="--feat-desc"
+                    COMMITCRAFT_DESC="$FEAT_DESC"
+                else
+                    COMMITCRAFT_ARGS="--feat"
+                fi
+                ;;
+            d|D)
+                printf "Describe the documentation change (optional): "
+                read -r DOCS_DESC
+                if [ -n "$DOCS_DESC" ]; then
+                    COMMITCRAFT_ARGS="--docs-desc"
+                    COMMITCRAFT_DESC="$DOCS_DESC"
+                else
+                    COMMITCRAFT_ARGS="--docs"
+                fi
+                ;;
+            r|R)
+                printf "Describe the refactoring (optional): "
+                read -r REFACT_DESC
+                if [ -n "$REFACT_DESC" ]; then
+                    COMMITCRAFT_ARGS="--refact-desc"
+                    COMMITCRAFT_DESC="$REFACT_DESC"
+                else
+                    COMMITCRAFT_ARGS="--refact"
+                fi
+                ;;
+            *)
+                # No specific type, use default
+                ;;
+        esac
+    fi
 
     # Check if confirmation mode is enabled (via hook --confirm or COMMITCRAFT_CONFIRM env var)
     ENABLE_CONFIRMATION="{hook_has_confirm}"
@@ -1266,6 +1272,86 @@ if [ -z "$COMMIT_SOURCE" ]; then
         exit 0
     fi
 
+    # Check if COMMITCRAFT_CLUE_PROMPT env var overrides the hook's interactive mode
+    # COMMITCRAFT_CLUE_PROMPT=1 or true: always prompt
+    # COMMITCRAFT_CLUE_PROMPT=0: never prompt
+    # Not set: use hook's installed mode (non-interactive in this script)
+    SHOULD_PROMPT_CLUES=0  # Default for non-interactive hook
+    if [ "$COMMITCRAFT_CLUE_PROMPT" = "0" ]; then
+        SHOULD_PROMPT_CLUES=0
+    elif [ "$COMMITCRAFT_CLUE_PROMPT" = "1" ] || [ "$COMMITCRAFT_CLUE_PROMPT" = "true" ]; then
+        SHOULD_PROMPT_CLUES=1
+    fi
+
+    # Build CommitCraft arguments based on user input
+    COMMITCRAFT_ARGS=""
+
+    if [ "$SHOULD_PROMPT_CLUES" = "1" ]; then
+        # Interactive prompt for commit type (enabled via COMMITCRAFT_CLUE_PROMPT)
+        # Redirect input from terminal to make read work in git hook
+        exec < /dev/tty
+
+        echo "CommitCraft: What type of commit is this?"
+        echo "  [b] Bug fix"
+        echo "  [f] Feature"
+        echo "  [d] Documentation"
+        echo "  [r] Refactoring"
+        echo "  [n] None (no specific type)"
+        echo "  [s] Skip (write message manually)"
+        printf "Your choice (b/f/d/r/n/s) [n]: "
+        read -r COMMIT_TYPE
+
+        case "$COMMIT_TYPE" in
+            s|S)
+                # User wants to skip and write manually
+                exit 0
+                ;;
+            b|B)
+                printf "Describe the bug fix (optional): "
+                read -r BUG_DESC
+                if [ -n "$BUG_DESC" ]; then
+                    COMMITCRAFT_ARGS="--bug-desc"
+                    COMMITCRAFT_DESC="$BUG_DESC"
+                else
+                    COMMITCRAFT_ARGS="--bug"
+                fi
+                ;;
+            f|F)
+                printf "Describe the feature (optional): "
+                read -r FEAT_DESC
+                if [ -n "$FEAT_DESC" ]; then
+                    COMMITCRAFT_ARGS="--feat-desc"
+                    COMMITCRAFT_DESC="$FEAT_DESC"
+                else
+                    COMMITCRAFT_ARGS="--feat"
+                fi
+                ;;
+            d|D)
+                printf "Describe the documentation change (optional): "
+                read -r DOCS_DESC
+                if [ -n "$DOCS_DESC" ]; then
+                    COMMITCRAFT_ARGS="--docs-desc"
+                    COMMITCRAFT_DESC="$DOCS_DESC"
+                else
+                    COMMITCRAFT_ARGS="--docs"
+                fi
+                ;;
+            r|R)
+                printf "Describe the refactoring (optional): "
+                read -r REFACT_DESC
+                if [ -n "$REFACT_DESC" ]; then
+                    COMMITCRAFT_ARGS="--refact-desc"
+                    COMMITCRAFT_DESC="$REFACT_DESC"
+                else
+                    COMMITCRAFT_ARGS="--refact"
+                fi
+                ;;
+            *)
+                # No specific type, use default
+                ;;
+        esac
+    fi
+
     # Check if confirmation mode is enabled (via hook --confirm or COMMITCRAFT_CONFIRM env var)
     ENABLE_CONFIRMATION="{hook_has_confirm}"
     if [ -n "$COMMITCRAFT_CONFIRM" ]; then
@@ -1274,8 +1360,10 @@ if [ -z "$COMMIT_SOURCE" ]; then
 
     # If confirmation is enabled, show dry-run first and ask for confirmation
     if [ -n "$ENABLE_CONFIRMATION" ]; then
-        # Redirect input from terminal to make read work in git hook
-        exec < /dev/tty
+        # Redirect input from terminal to make read work in git hook (if not already redirected)
+        if [ "$SHOULD_PROMPT_CLUES" = "0" ]; then
+            exec < /dev/tty
+        fi
 
         # Unset COMMITCRAFT_CONFIRM to prevent CLI from showing its own confirmation
         unset COMMITCRAFT_CONFIRM
@@ -1286,7 +1374,13 @@ if [ -z "$COMMIT_SOURCE" ]; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
 
         # Run dry-run to show token usage
-        CommitCraft --dry-run >&2
+        if [ -n "$COMMITCRAFT_DESC" ]; then
+            CommitCraft --dry-run $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC" >&2
+        elif [ -n "$COMMITCRAFT_ARGS" ]; then
+            CommitCraft --dry-run $COMMITCRAFT_ARGS >&2
+        else
+            CommitCraft --dry-run >&2
+        fi
 
         echo "" >&2
         printf "Proceed with commit message generation? (Y/n): " >&2
@@ -1303,8 +1397,14 @@ if [ -z "$COMMIT_SOURCE" ]; then
 
     # Generate commit message with CommitCraft (without --confirm flag)
 
-    # stderr goes to terminal (shows loading spinner), stdout captured
-    GENERATED_MSG=$(CommitCraft)
+    # Pass description as a separate argument to avoid quoting issues
+    if [ -n "$COMMITCRAFT_DESC" ]; then
+        GENERATED_MSG=$(CommitCraft $COMMITCRAFT_ARGS "$COMMITCRAFT_DESC")
+    elif [ -n "$COMMITCRAFT_ARGS" ]; then
+        GENERATED_MSG=$(CommitCraft $COMMITCRAFT_ARGS)
+    else
+        GENERATED_MSG=$(CommitCraft)
+    fi
 
     if [ $? -eq 0 ] && [ -n "$GENERATED_MSG" ]; then
         # Prepend generated message to commit message file
@@ -1363,22 +1463,224 @@ def unhook(
     global_hook: Annotated[
         bool,
         typer.Option(
-            "--global", "-g", is_flag=True, help="Remove the global git hook template"
+            "--global", "-g", is_flag=True, help="Remove global git hook template"
         ),
     ] = False,
 ):
     """
     [bold red]Remove the CommitCraft git hook.[/bold red]
 
-    This command removes the [yellow]prepare-commit-msg[/yellow] hook installed by CommitCraft.
-
-    [bold]Options:[/bold]
-    • [green]Local (default)[/green]: Removes hook from current repository
-    • [blue]Global[/blue]: Removes hook from git template directory (use [yellow]--global[/yellow])
-
-    [dim]Alias for: CommitCraft hook --uninstall[/dim]
+    Alias for [cyan]CommitCraft hook --uninstall[/cyan].
+    Use [yellow]--global[/yellow] to remove the global hook template.
     """
     _uninstall_hook(global_hook)
+
+
+@app.command("envvars")
+def envvars():
+    """
+    [bold cyan]Display all supported environment variables.[/bold cyan]
+
+    Shows a comprehensive list of environment variables that can be used to configure
+    CommitCraft behavior, including API keys, model settings, and hook configuration.
+    """
+    from rich.table import Table
+
+    table = Table(
+        title="CommitCraft Environment Variables",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Variable Name", style="green", no_wrap=True)
+    table.add_column("Description", style="white")
+    table.add_column("Example/Notes", style="dim")
+
+    # API Keys
+    table.add_section()
+    table.add_row(
+        "[bold yellow]API Keys[/bold yellow]",
+        "[bold yellow]Provider authentication[/bold yellow]",
+        "",
+    )
+    table.add_row(
+        "OPENAI_API_KEY",
+        "API key for OpenAI provider",
+        "sk-...",
+    )
+    table.add_row(
+        "GROQ_API_KEY",
+        "API key for Groq provider",
+        "gsk_...",
+    )
+    table.add_row(
+        "GOOGLE_API_KEY",
+        "API key for Google Gemini provider",
+        "AIza...",
+    )
+    table.add_row(
+        "ANTHROPIC_API_KEY",
+        "API key for Anthropic Claude provider",
+        "sk-ant-...",
+    )
+    table.add_row(
+        "OLLAMA_API_KEY",
+        "API key for Ollama Cloud or remote instances",
+        "Optional for remote Ollama",
+    )
+    table.add_row(
+        "CUSTOM_API_KEY",
+        "API key for openai_compatible provider",
+        "Required for custom endpoints",
+    )
+    table.add_row(
+        "NICKNAME_API_KEY",
+        "API key for named provider profiles",
+        "e.g., REMOTE_API_KEY, DEEPSEEK_API_KEY",
+    )
+
+    # Provider Configuration
+    table.add_section()
+    table.add_row(
+        "[bold yellow]Provider Configuration[/bold yellow]",
+        "[bold yellow]Provider-specific settings[/bold yellow]",
+        "",
+    )
+    table.add_row(
+        "OLLAMA_HOST",
+        "Host URL for Ollama provider",
+        "http://localhost:11434",
+    )
+    table.add_row(
+        "COMMITCRAFT_PROVIDER",
+        "Default LLM provider",
+        "ollama, openai, groq, google, anthropic",
+    )
+    table.add_row(
+        "COMMITCRAFT_MODEL",
+        "Default model name",
+        "qwen3, gpt-4, gemini-2.5-flash, etc.",
+    )
+    table.add_row(
+        "COMMITCRAFT_HOST",
+        "API host URL (for custom providers)",
+        "https://api.example.com",
+    )
+
+    # Model Options
+    table.add_section()
+    table.add_row(
+        "[bold yellow]Model Options[/bold yellow]",
+        "[bold yellow]Generation parameters[/bold yellow]",
+        "",
+    )
+    table.add_row(
+        "COMMITCRAFT_SYSTEM_PROMPT",
+        "Custom system prompt for the model",
+        "Override default prompt",
+    )
+    table.add_row(
+        "COMMITCRAFT_TEMPERATURE",
+        "Sampling temperature (creativity)",
+        "0.0-2.0 (default varies by provider)",
+    )
+    table.add_row(
+        "COMMITCRAFT_TOP_P",
+        "Nucleus sampling threshold",
+        "0.0-1.0",
+    )
+    table.add_row(
+        "COMMITCRAFT_MAX_TOKENS",
+        "Maximum tokens to generate",
+        "Integer value",
+    )
+    table.add_row(
+        "COMMITCRAFT_NUM_CTX",
+        "Context window size (Ollama)",
+        "Integer value",
+    )
+    table.add_row(
+        "COMMITCRAFT_MIN_CONTEXT_SIZE",
+        "Minimum context size for auto-calculation",
+        "Default: 1024",
+    )
+    table.add_row(
+        "COMMITCRAFT_MAX_CONTEXT_SIZE",
+        "Maximum context size for auto-calculation",
+        "Default: 128000",
+    )
+
+    # Behavior & Features
+    table.add_section()
+    table.add_row(
+        "[bold yellow]Behavior & Features[/bold yellow]",
+        "[bold yellow]Tool behavior settings[/bold yellow]",
+        "",
+    )
+    table.add_row(
+        "COMMITCRAFT_EMOJI",
+        "Emoji mode for commit messages",
+        "simple, full, no/false, or custom string",
+    )
+    table.add_row(
+        "COMMITCRAFT_NO_EMOJI",
+        "Disable emoji in commit messages (deprecated)",
+        "Use COMMITCRAFT_EMOJI=no instead",
+    )
+    table.add_row(
+        "COMMITCRAFT_SHOW_THINKING",
+        "Display model's thinking process if available",
+        "1/true to enable, 0/false to disable",
+    )
+    table.add_row(
+        "COMMITCRAFT_CONFIRM",
+        "Enable two-step confirmation mode",
+        "Shows dry-run before generating",
+    )
+
+    # Output & Display
+    table.add_section()
+    table.add_row(
+        "[bold yellow]Output & Display[/bold yellow]",
+        "[bold yellow]Terminal output settings[/bold yellow]",
+        "",
+    )
+    table.add_row(
+        "NO_COLOR",
+        "Disable colored output (standard)",
+        "1 to disable colors",
+    )
+    table.add_row(
+        "FORCE_COLOR",
+        "Force colored output",
+        "1 to force colors (default)",
+    )
+
+    # Git Hook Settings
+    table.add_section()
+    table.add_row(
+        "[bold yellow]Git Hook Settings[/bold yellow]",
+        "[bold yellow]Hook behavior configuration[/bold yellow]",
+        "",
+    )
+    table.add_row(
+        "COMMITCRAFT_SKIP",
+        "Skip CommitCraft hook execution",
+        "Set to 1 to skip: COMMITCRAFT_SKIP=1 git commit",
+    )
+    table.add_row(
+        "COMMITCRAFT_CLUE_PROMPT",
+        "Override hook's interactive mode for CommitClues",
+        "1/true=always prompt, 0=never prompt, unset=use hook default",
+    )
+
+    console.print(table)
+    console.print(
+        "\n[dim]💡 Tip: Set these in [cyan].env[/cyan] or [cyan]CommitCraft.env[/cyan] file, "
+        "or export them in your shell.[/dim]"
+    )
+    console.print(
+        "[dim]📖 For more details, see: [cyan]https://github.com/nebius-group/CommitCraft#environment-variables[/cyan][/dim]"
+    )
 
 
 def _uninstall_hook(global_hook: bool):

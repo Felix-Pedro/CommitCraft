@@ -612,6 +612,7 @@ CommitCraft integrates with git hooks via the `prepare-commit-msg` hook. When in
 | :--- | :--- | :--- |
 | `COMMITCRAFT_SKIP` | Skip CommitCraft hook for a single commit | `COMMITCRAFT_SKIP=1 git commit` |
 | `COMMITCRAFT_CONFIRM` | Enable two-step confirmation mode (works in hooks even without --confirm flag) | `COMMITCRAFT_CONFIRM=1 git commit` |
+| `COMMITCRAFT_CLUE_PROMPT` | Override hook's interactive mode: `1` or `true` to always prompt for CommitClues, `0` to never prompt, unset to use hook's installed mode | `COMMITCRAFT_CLUE_PROMPT=1 git commit` |
 | `COMMITCRAFT_NO_EMOJI` | Disable emoji in commit messages (overrides config) | `COMMITCRAFT_NO_EMOJI=1 CommitCraft` |
 
 ### Hook Behavior
@@ -649,6 +650,33 @@ CommitCraft unhook
 # Uninstall global hook
 CommitCraft unhook --global
 ```
+
+### Controlling CommitClue Prompts
+
+The `COMMITCRAFT_CLUE_PROMPT` environment variable allows you to override the hook's installed interactive mode on a per-commit basis:
+
+**Override Modes:**
+- `COMMITCRAFT_CLUE_PROMPT=1` or `COMMITCRAFT_CLUE_PROMPT=true` - Always prompt for CommitClues (enables interactive mode)
+- `COMMITCRAFT_CLUE_PROMPT=0` - Never prompt for CommitClues (forces non-interactive mode)
+- Unset (default) - Use the hook's installed mode (interactive or non-interactive)
+
+**Example Usage:**
+
+```bash
+# Force interactive prompts on a non-interactive hook
+COMMITCRAFT_CLUE_PROMPT=1 git commit
+
+# Disable prompts on an interactive hook
+COMMITCRAFT_CLUE_PROMPT=0 git commit
+
+# Use hook's default behavior
+git commit
+```
+
+This is particularly useful when:
+- You installed a non-interactive hook but occasionally want to provide CommitClues
+- You installed an interactive hook but want to skip prompts for quick commits
+- You want to control interactivity without reinstalling the hook
 
 ### Dry-Run and Confirmation Modes
 

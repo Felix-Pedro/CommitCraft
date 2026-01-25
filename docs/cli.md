@@ -355,6 +355,18 @@ CommitCraft --confirm --bug-desc "Fixed authentication timeout"
 
 ## Subcommands
 
+CommitCraft provides several subcommands for managing configuration and git hooks:
+
+| Command | Description |
+| :--- | :--- |
+| `hook` | Install CommitCraft as a git prepare-commit-msg hook |
+| `unhook` | Remove CommitCraft git hook (alias for `hook --uninstall`) |
+| `config` | Interactive wizard to create/edit configuration files |
+| `envvars` | Display all supported environment variables with descriptions |
+| `init` | (Not implemented) Initialize a new CommitCraft project |
+
+---
+
 ### `hook`
 
 Sets up CommitCraft as a git `prepare-commit-msg` hook. This integrates CommitCraft directly into your `git commit` workflow.
@@ -501,6 +513,55 @@ pnpm-lock.yaml
 ```
 
 You can edit the generated `.commitcraft/.ignore` file to add or remove patterns as needed.
+
+---
+
+### `envvars`
+
+Displays a comprehensive, categorized table of all supported environment variables.
+
+```bash
+CommitCraft envvars
+```
+
+This command shows all environment variables that can be used to configure CommitCraft, organized into the following categories:
+
+*   **API Keys:** Authentication for various LLM providers (OpenAI, Groq, Google, Anthropic, Ollama, etc.)
+*   **Provider Configuration:** Default provider and host settings
+*   **Model Options:** Generation parameters like temperature, max tokens, context size
+*   **Behavior & Features:** Emoji settings, confirmation mode, thinking display
+*   **Output & Display:** Color output control
+*   **Git Hook Settings:** Hook behavior including skip and interactive prompt control
+
+#### Example Output
+
+```
+┌──────────────────────────────┬────────────────────────────┬──────────────────────────┐
+│ Variable Name                │ Description                │ Example/Notes            │
+├──────────────────────────────┼────────────────────────────┼──────────────────────────┤
+│ API Keys                     │ Provider authentication    │                          │
+│ OPENAI_API_KEY               │ API key for OpenAI         │ sk-...                   │
+│ GROQ_API_KEY                 │ API key for Groq           │ gsk_...                  │
+│ ...                          │                            │                          │
+│ Git Hook Settings            │ Hook behavior config       │                          │
+│ COMMITCRAFT_SKIP             │ Skip hook execution        │ COMMITCRAFT_SKIP=1       │
+│ COMMITCRAFT_CLUE_PROMPT      │ Override hook interactive  │ 1/true=prompt, 0=no      │
+│                              │ mode for CommitClues       │ prompt                   │
+└──────────────────────────────┴────────────────────────────┴──────────────────────────┘
+```
+
+!!! tip "Quick Reference"
+    Run `CommitCraft envvars` anytime to see the complete list of environment variables without checking the documentation.
+
+!!! info "Environment Variable Files"
+    All environment variables can be set in:
+    
+    *   `.env` file in your project root
+    *   `CommitCraft.env` file in your project root
+    *   Global `.env` in `~/.config/commitcraft/` (or platform-specific config directory)
+    *   Your shell environment (e.g., `export COMMITCRAFT_MODEL=gpt-4` in `.bashrc`)
+
+---
 
 ### `init`
 
