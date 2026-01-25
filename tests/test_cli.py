@@ -38,7 +38,14 @@ def test_main_no_diff(mock_get_diff):
 @patch("commitcraft.__main__.commit_craft")
 def test_dry_run(mock_commit_craft, mock_get_diff):
     mock_get_diff.return_value = "diff --git a/file b/file..."
-    # dry-run usually prints token usage but doesn't generate message
+    # dry-run should return a dict with token usage stats
+    mock_commit_craft.return_value = {
+        "token_count": 100,
+        "system_prompt_tokens": 50,
+        "user_prompt_tokens": 50,
+        "model": "test-model",
+        "provider": "test-provider",
+    }
 
     result = runner.invoke(app, ["--dry-run"])
     assert result.exit_code == 0

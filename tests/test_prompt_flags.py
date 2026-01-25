@@ -498,3 +498,241 @@ def test_no_clues_no_clues_section(simple_diff, default_model, default_context):
 
     # Should NOT have Clues section when no clues provided
     assert "Clues:" not in prompt
+
+
+# Dry Run and Debug Prompt Combined Tests
+
+
+def test_dry_run_only(simple_diff, default_model, default_context):
+    """Test that dry_run=True without debug_prompt returns usage statistics."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=False,
+        dry_run=True,
+    )
+
+    # Should return a dictionary with token statistics
+    assert isinstance(result, dict)
+    assert "token_count" in result
+    assert "system_prompt_tokens" in result
+    assert "user_prompt_tokens" in result
+    assert "model" in result
+    assert "provider" in result
+
+    # Should NOT include prompts when debug_prompt is False
+    assert "system_prompt" not in result
+    assert "user_prompt" not in result
+
+
+def test_debug_prompt_only(simple_diff, default_model, default_context):
+    """Test that debug_prompt=True without dry_run returns formatted prompt string."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=False,
+    )
+
+    # Should return a formatted string
+    assert isinstance(result, str)
+    assert "system_prompt:" in result
+    assert "prompt:" in result
+    assert "You are a commit message helper" in result
+    assert "def hello(): pass" in result
+
+
+def test_dry_run_and_debug_prompt_combined(simple_diff, default_model, default_context):
+    """Test that dry_run=True AND debug_prompt=True returns both stats and prompts."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=True,
+    )
+
+    # Should return a dictionary with both statistics AND prompts
+    assert isinstance(result, dict)
+
+    # Should include token statistics
+    assert "token_count" in result
+    assert "system_prompt_tokens" in result
+    assert "user_prompt_tokens" in result
+    assert "model" in result
+    assert "provider" in result
+
+    # Should ALSO include full prompts
+    assert "system_prompt" in result
+    assert "user_prompt" in result
+
+    # Verify prompt content
+    assert "You are a commit message helper" in result["system_prompt"]
+    assert "def hello(): pass" in result["user_prompt"]
+    assert "Beginning of the diff" in result["user_prompt"]
+
+
+def test_dry_run_debug_prompt_with_emoji_enabled(
+    simple_diff, default_model, default_context
+):
+    """Test dry_run + debug_prompt includes emoji guidelines in system prompt."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.single, emoji_convention="simple")
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=True,
+    )
+
+    # Should be a dictionary with both stats and prompts
+    assert isinstance(result, dict)
+    assert "system_prompt" in result
+    assert "user_prompt" in result
+
+    # System prompt should include emoji guidelines
+    assert (
+        "For the title of your message use the GitMoji Convention"
+        in result["system_prompt"]
+    )
+    assert "✨ ; Introduce new features" in result["system_prompt"]
+
+    # Token counts should reflect the added emoji guidelines
+    assert result["token_count"] > 0
+    assert result["system_prompt_tokens"] > 0
+
+
+def test_dry_run_debug_prompt_with_no_emoji(
+    simple_diff, default_model, default_context
+):
+    """Test dry_run + debug_prompt includes no-emoji instruction when emoji disabled."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=True,
+    )
+
+    # Should be a dictionary
+    assert isinstance(result, dict)
+    assert "system_prompt" in result
+
+    # System prompt should include no-emoji instruction
+    assert "IMPORTANT: Do NOT include any emojis" in result["system_prompt"]
+    assert "Use plain text only" in result["system_prompt"]
+
+    # Should NOT include emoji guidelines
+    assert (
+        "For the title of your message use the GitMoji Convention"
+        not in result["system_prompt"]
+    )
+
+
+def test_dry_run_debug_prompt_with_clues(simple_diff, default_model, default_context):
+    """Test dry_run + debug_prompt includes clues in the prompt."""
+    inp = CommitCraftInput(
+        diff=simple_diff, bug="Fixed memory leak", feat="Added caching"
+    )
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=True,
+    )
+
+    # Should include both statistics and prompts
+    assert isinstance(result, dict)
+    assert "user_prompt" in result
+
+    # User prompt should include clues
+    assert "Fixed memory leak" in result["user_prompt"]
+    assert "Added caching" in result["user_prompt"]
+    assert "Clues:" in result["user_prompt"]
+
+
+def test_dry_run_debug_prompt_token_count_accuracy(
+    simple_diff, default_model, default_context
+):
+    """Test that token counts are accurate when using dry_run + debug_prompt."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    result = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=True,
+    )
+
+    # Verify token count relationship
+    assert isinstance(result, dict)
+    assert result["token_count"] > 0
+    assert result["system_prompt_tokens"] > 0
+    assert result["user_prompt_tokens"] > 0
+
+    # Total should be sum of system + user tokens
+    assert (
+        result["token_count"]
+        == result["system_prompt_tokens"] + result["user_prompt_tokens"]
+    )
+
+
+def test_dry_run_debug_prompt_returns_dict_with_prompts(
+    simple_diff, default_model, default_context
+):
+    """Test that combining dry_run and debug_prompt returns a dict (not a string)."""
+    inp = CommitCraftInput(diff=simple_diff)
+    emoji_config = EmojiConfig(emoji_steps=EmojiSteps.false)
+
+    # When using ONLY debug_prompt, it returns a string
+    result_debug_only = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=False,
+    )
+    assert isinstance(result_debug_only, str)
+
+    # When using BOTH dry_run AND debug_prompt, it returns a dict
+    result_combined = commit_craft(
+        inp,
+        default_model,
+        default_context,
+        emoji_config,
+        debug_prompt=True,
+        dry_run=True,
+    )
+    assert isinstance(result_combined, dict)
+    assert "system_prompt" in result_combined
+    assert "user_prompt" in result_combined
+    assert "token_count" in result_combined

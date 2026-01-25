@@ -387,11 +387,7 @@ def commit_craft(
         # Explicitly instruct the model NOT to use emojis
         system_prompt += "\n\nIMPORTANT: Do NOT include any emojis in the commit message. Use plain text only."
 
-    # Debug mode: return prompts without calling LLM
-    if debug_prompt:
-        return f"system_prompt:\n{system_prompt}\n\nprompt:\n{user_prompt}"
-
-    # Get provider instance and generate response
+    # Get provider instance
     try:
         model_options = models.options.model_dump() if models.options else {}
         provider = get_provider(
@@ -403,8 +399,20 @@ def commit_craft(
             nickname=models.nickname,
         )
 
+        # Handle dry_run mode (with or without debug_prompt)
         if dry_run:
-            return provider.calculate_usage(system_prompt, user_prompt)
+            usage_stats = provider.calculate_usage(system_prompt, user_prompt)
+
+            # If debug_prompt is also enabled, add prompts to the output
+            if debug_prompt:
+                usage_stats["system_prompt"] = system_prompt
+                usage_stats["user_prompt"] = user_prompt
+
+            return usage_stats
+
+        # Debug mode without dry_run: return prompts without calling LLM
+        if debug_prompt:
+            return f"system_prompt:\n{system_prompt}\n\nprompt:\n{user_prompt}"
 
         return provider.generate(system_prompt, user_prompt)
     except LLMProviderError as e:
