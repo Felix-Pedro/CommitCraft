@@ -9,6 +9,8 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/Felix-Pedro/CommitCraft?style=social)
 ![GitHub contributors](https://img.shields.io/github/contributors/Felix-Pedro/CommitCraft)
 
+[![asciicast](https://asciinema.org/a/Ycud7YEMTHuXbMxu.svg)](https://asciinema.org/a/Ycud7YEMTHuXbMxu)
+
 CommitCraft is a tool designed to enhance your commit messages by leveraging Large Language Models (LLMs). It provides an intuitive interface that simplifies the process of generating better, more informative commit messages based on staged changes in your git repository.
 
 **Doesn't every code editor, CLI, git helper and toaster have this feature?**
@@ -176,6 +178,18 @@ You can skip the CommitCraft hook in several ways:
 2. **Interactive Mode**: Choose `[s] Skip (write message manually)` from the interactive menu
 
 3. **Auto-Skip on `-m` Flag**: The hook automatically skips when you provide your own message with `git commit -m "your message"`
+
+**Controlling CommitClue Prompts:**
+
+Override the hook's interactive mode on a per-commit basis using `COMMITCRAFT_CLUE_PROMPT`:
+
+```bash
+# Force interactive prompts (even on non-interactive hooks)
+COMMITCRAFT_CLUE_PROMPT=1 git commit
+
+# Disable prompts (even on interactive hooks)
+COMMITCRAFT_CLUE_PROMPT=0 git commit
+```
 
 Once installed, the hook will automatically generate a commit message whenever you run `git commit`. The AI-generated message will be pre-filled in your editor for you to review and edit before finalizing.
 
