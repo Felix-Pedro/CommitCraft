@@ -276,6 +276,13 @@ def main(
             help="Return the [yellow]prompt[/yellow], don't send any request to the model",
         ),
     ] = False,
+    compact: Annotated[
+        bool,
+        typer.Option(
+            is_flag=True,
+            help="When using [cyan]--dry-run --debug-prompt[/cyan] together, show prompts only in table (truncated) without full output below",
+        ),
+    ] = False,
     provider: Annotated[
         Optional[str],
         typer.Option(
@@ -477,13 +484,22 @@ def main(
             help="Enable two-step confirmation: show dry-run info and settings, then ask for confirmation before generating",
         ),
     ] = False,
+    emoji: Annotated[
+        Optional[str],
+        typer.Option(
+            rich_help_panel="Model Config",
+            envvar="COMMITCRAFT_EMOJI",
+            help="Emoji mode: [cyan]simple[/cyan] (common emojis), [cyan]full[/cyan] (complete GitMoji), [cyan]no[/cyan]/[cyan]false[/cyan] (disabled), or custom string. Overrides config.",
+        ),
+    ] = None,
     no_emoji: Annotated[
         bool,
         typer.Option(
             rich_help_panel="Model Config",
             envvar="COMMITCRAFT_NO_EMOJI",
             is_flag=True,
-            help="Disable emoji in commit messages (overrides config emoji settings)",
+            hidden=True,  # Keep for backward compatibility but hide from help
+            help="[dim](Deprecated: use --emoji no instead)[/dim] Disable emoji in commit messages",
         ),
     ] = False,
 ):
@@ -554,12 +570,31 @@ def main(
             }
         )
 
-        # Handle emoji configuration - CLI --no-emoji flag overrides config
-        if no_emoji:
+        # Handle emoji configuration - CLI flags override config
+        # Priority: --emoji flag > --no-emoji flag (deprecated) > config > defaults
+        if emoji is not None:
+            # Parse --emoji flag value
+            emoji_lower = emoji.lower()
+            if emoji_lower in ("no", "false", "none", "off", "disable", "disabled"):
+                emoji_config = EmojiConfig(
+                    emoji_steps=EmojiSteps.false, emoji_convention="simple"
+                )
+            elif emoji_lower in ("simple", "full"):
+                emoji_config = EmojiConfig(
+                    emoji_steps=EmojiSteps.single, emoji_convention=emoji_lower
+                )
+            else:
+                # Custom emoji string
+                emoji_config = EmojiConfig(
+                    emoji_steps=EmojiSteps.single, emoji_convention=emoji
+                )
+        elif no_emoji:
+            # Backward compatibility for --no-emoji flag
             emoji_config = EmojiConfig(
                 emoji_steps=EmojiSteps.false, emoji_convention="simple"
             )
         else:
+            # Use config or defaults
             emoji_config = (
                 EmojiConfig(**config.get("emoji"))
                 if config.get("emoji")
@@ -681,11 +716,39 @@ def main(
                 table.add_column("Metric", style="cyan")
                 table.add_column("Value", style="green")
 
+                # Type check: dry_run=True always returns a dict (unless mocked in tests)
+                if not isinstance(response, dict):
+                    # This shouldn't happen in production, but handle it gracefully for tests
+                    console.print(
+                        "[yellow]Warning: Expected dict response in dry-run mode[/yellow]"
+                    )
+                    return
+
                 for key, value in response.items():
                     key_fmt = key.replace("_", " ").title()
-                    table.add_row(key_fmt, str(value))
+                    # Format long prompts more nicely in the table
+                    if key in ("system_prompt", "user_prompt") and debug_prompt:
+                        # Truncate very long prompts for display
+                        value_str = str(value)
+                        if len(value_str) > 500:
+                            value_str = value_str[:497] + "..."
+                        table.add_row(key_fmt, value_str)
+                    else:
+                        table.add_row(key_fmt, str(value))
 
                 console.print(table)
+
+                # If debug_prompt is enabled and NOT compact mode, show full prompts after the table
+                if (
+                    debug_prompt
+                    and isinstance(response, dict)
+                    and "system_prompt" in response
+                    and not compact
+                ):
+                    console.print("\n[bold cyan]System Prompt:[/bold cyan]")
+                    console.print(response["system_prompt"])
+                    console.print("\n[bold cyan]User Prompt:[/bold cyan]")
+                    console.print(response["user_prompt"])
 
             # If only dry_run (not confirm), exit here
             if dry_run and not confirm:
