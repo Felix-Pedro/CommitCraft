@@ -9,7 +9,7 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/Felix-Pedro/CommitCraft?style=social)
 ![GitHub contributors](https://img.shields.io/github/contributors/Felix-Pedro/CommitCraft)
 
-[![asciicast](https://asciinema.org/a/Ycud7YEMTHuXbMxu.svg)](https://asciinema.org/a/Ycud7YEMTHuXbMxu)
+[![CommitCraft Demo](commitcraft-demo.gif)](https://asciinema.org/a/SU2gpwni7jcAnxwd)
 
 CommitCraft is a tool designed to enhance your commit messages by leveraging Large Language Models (LLMs). It provides an intuitive interface that simplifies the process of generating better, more informative commit messages based on staged changes in your git repository.
 
