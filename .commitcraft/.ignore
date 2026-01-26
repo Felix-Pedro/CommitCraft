@@ -1,1 +1,4 @@
-poetry.lock
+*.lock
+*.svg
+*.gif
+*.cast
