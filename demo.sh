@@ -117,7 +117,7 @@ pause $DELAY_SHORT
 type_text "# New feature"
 type_text "CommitCraft --feat / CommitCraft --feat-desc 'Added dark mode support'"
 echo
-echo -e " \e[33m--refact\e[0m and \e[33m--docs\e[0m are also available or you can give out custom clue with \e[33m--context-clue\e[0m"
+echo -e " \e[33m--refact\e[0m and \e[33m--docs\e[0m are also available or you can give out custom clue with \e[33m--context-clue\e[0m`"
 echo
 pause $DELAY_LONG
 clear
