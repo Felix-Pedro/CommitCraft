@@ -110,8 +110,12 @@ class TestAnthropicProvider:
         # Execute
         result = provider.calculate_usage("System", "User")
 
-        # Verify - should be 84 since count_tokens is called twice (system + user)
-        assert result["token_count"] == 84
+        # Verify - count_tokens is called twice (system + user separately)
+        # Each call returns 42, minus 1 for placeholder = 41 each
+        # Total = 41 + 41 = 82
+        assert result["token_count"] == 82
+        assert result["system_prompt_tokens"] == 41
+        assert result["user_prompt_tokens"] == 41
         assert mock_client.messages.count_tokens.call_count == 2
 
 

@@ -505,32 +505,40 @@ class AnthropicProvider(LLMProvider):
             raise LLMProviderError(f"Anthropic generation failed: {e}") from e
 
     def calculate_usage(self, system_prompt: str, user_prompt: str) -> dict:
-        """Calculate token usage using Anthropic's native count_tokens API."""
+        """Calculate token usage using Anthropic's native count_tokens API.
+
+        Uses a single-character placeholder workaround to get accurate token counts
+        for system and user prompts separately, since Anthropic's API doesn't allow
+        empty content in messages or system fields.
+        """
         import anthropic
 
         try:
             client = anthropic.Anthropic(api_key=self.api_key)
 
-            # Count total tokens with both system and user prompts
-            total_response = client.messages.count_tokens(
+            # Count system prompt tokens using a single-char placeholder for user message
+            # Anthropic API doesn't allow empty content, so we use " " and subtract 1
+            system_response = client.messages.count_tokens(
                 model=self.model,
                 system=system_prompt,
+                messages=[{"role": "user", "content": " "}],  # Single space placeholder
+            )
+            system_tokens = max(
+                0, system_response.input_tokens - 1
+            )  # Subtract placeholder
+
+            # Count user prompt tokens using a single-char placeholder for system
+            user_response = client.messages.count_tokens(
+                model=self.model,
+                system=" ",  # Single space placeholder
                 messages=[{"role": "user", "content": user_prompt}],
             )
-            total_tokens = total_response.input_tokens
-
-            # For breakdown, use tiktoken as fallback since Anthropic API
-            # no longer allows empty content for separate counting
-            import tiktoken
-
-            enc = tiktoken.get_encoding("cl100k_base")
-            system_tokens = len(enc.encode(system_prompt))
-            user_tokens = len(enc.encode(user_prompt))
+            user_tokens = max(0, user_response.input_tokens - 1)  # Subtract placeholder
 
             result = {
-                "token_count": total_tokens,  # Use accurate Anthropic total
-                "system_prompt_tokens": system_tokens,  # Estimated breakdown
-                "user_prompt_tokens": user_tokens,  # Estimated breakdown
+                "token_count": system_tokens + user_tokens,
+                "system_prompt_tokens": system_tokens,
+                "user_prompt_tokens": user_tokens,
                 "model": self.model,
                 "provider": self.nickname if self.nickname else self.provider_name,
             }
