@@ -139,8 +139,8 @@ def test_clue_bug_boolean(simple_diff, default_model, default_context):
 
     # Should include bug clue
     assert "This commit focus on fixing a bug" in prompt
-    # Should show "Clues:" section
-    assert "Clues:" in prompt
+    # Should show "Context clues for this commit:" section
+    assert "Context clues for this commit:" in prompt
 
 
 def test_clue_bug_description(simple_diff, default_model, default_context):
@@ -402,8 +402,8 @@ def test_diff_content_in_prompt(simple_diff, default_model, default_context):
     assert "system_prompt:" in prompt
     assert "prompt:" in prompt
     # Should include diff markers
-    assert "Beginning of the diff" in prompt
-    assert "End of the diff" in prompt
+    assert "DIFF_BOUNDARY_" in prompt
+    assert "DIFF_BOUNDARY_" in prompt
     # Should include actual diff content
     assert "def hello(): pass" in prompt
     assert "diff --git a/test.py b/test.py" in prompt
@@ -497,7 +497,7 @@ def test_no_clues_no_clues_section(simple_diff, default_model, default_context):
     )
 
     # Should NOT have Clues section when no clues provided
-    assert "Clues:" not in prompt
+    assert "Context clues for this commit:" not in prompt
 
 
 # Dry Run and Debug Prompt Combined Tests
@@ -583,7 +583,7 @@ def test_dry_run_and_debug_prompt_combined(simple_diff, default_model, default_c
     # Verify prompt content
     assert "You are a commit message helper" in result["system_prompt"]
     assert "def hello(): pass" in result["user_prompt"]
-    assert "Beginning of the diff" in result["user_prompt"]
+    assert "DIFF_BOUNDARY_" in result["user_prompt"]
 
 
 def test_dry_run_debug_prompt_with_emoji_enabled(
@@ -673,7 +673,7 @@ def test_dry_run_debug_prompt_with_clues(simple_diff, default_model, default_con
     # User prompt should include clues
     assert "Fixed memory leak" in result["user_prompt"]
     assert "Added caching" in result["user_prompt"]
-    assert "Clues:" in result["user_prompt"]
+    assert "Context clues for this commit:" in result["user_prompt"]
 
 
 def test_dry_run_debug_prompt_token_count_accuracy(

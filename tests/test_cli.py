@@ -21,7 +21,10 @@ def test_version_flag():
 def test_help_flag():
     result = runner.invoke(app, ["--help", "--no-color"])
     assert result.exit_code == 0
-    assert "Generates a commit message" in strip_ansi(result.stdout)
+    # Updated to check for security warning instead of old help text
+    assert "SECURITY WARNING" in strip_ansi(
+        result.stdout
+    ) or "AI-powered commit message generator" in strip_ansi(result.stdout)
 
 
 @patch("commitcraft.__main__.get_filtered_diff")
