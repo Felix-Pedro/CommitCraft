@@ -9,6 +9,14 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ---
 
+## [1.1.1] - 2026-01-26
+
+### Fixed
+
+- **PyPI README Display**: Fixed demo GIF not displaying on PyPI package page. Changed relative path `commitcraft-demo.gif` to absolute GitHub raw URL `https://raw.githubusercontent.com/Felix-Pedro/CommitCraft/main/commitcraft-demo.gif` so the image renders correctly on PyPI.
+
+---
+
 ## [1.1.0] - 2026-01-26
 
 ### Changed
@@ -148,7 +156,8 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - GitMoji prompt.
 - Default system prompt.
 
-[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.0...v0.1.1
