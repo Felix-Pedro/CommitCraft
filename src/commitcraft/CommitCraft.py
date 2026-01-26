@@ -7,15 +7,20 @@ prompt construction, and LLM interactions through various providers.
 """
 
 import fnmatch
+import logging
 import subprocess
+import uuid
 from enum import Enum
 from typing import Literal
 
 from jinja2 import Template
-from pydantic import BaseModel, Extra, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator, model_validator
 
 from .defaults import default
 from .providers import LLMProviderError, get_provider
+
+# Set up logging for security warnings
+logger = logging.getLogger(__name__)
 
 # The empty tree hash is a well-known git constant that represents an empty directory tree.
 # It is used to generate a diff against "nothing" (e.g., for the initial commit or
@@ -296,8 +301,7 @@ class LModelOptions(BaseModel):
             raise ValueError("top_p must be between 0 and 1")
         return v
 
-    class Config:
-        extra = Extra.allow  # Allows for extra arguments
+    model_config = ConfigDict(extra="allow")  # Allows for extra arguments
 
 
 class Provider(str, Enum):
@@ -420,6 +424,14 @@ def clue_parser(input: CommitCraftInput) -> dict[str, str | bool]:
     Returns:
         Dictionary of parsed clues ready for template rendering
     """
+    # Log warning if custom_clue is used (typically from COMMITCRAFT_CLUE env var)
+    if input.custom_clue:
+        logger.warning(
+            "Using COMMITCRAFT_CLUE environment variable. "
+            "Ensure this is set by a trusted source. "
+            "Do not use CommitCraft in untrusted or unknown environments."
+        )
+
     clues_and_input = {}
     for key, value in input.model_dump().items():
         if value is True:
@@ -469,9 +481,17 @@ def commit_craft(
     system_prompt_template = models.system_prompt or default.get("system_prompt", "")
     system_prompt = Template(system_prompt_template).render(**context)
 
+    # Generate high-entropy random separator for prompt injection protection
+    # This creates a unique boundary like "DIFF_BOUNDARY_a1b2c3d4e5f6..."
+    # An attacker cannot predict this UUID generated at runtime, preventing
+    # delimiter escape attacks (similar to CSRF tokens or MIME boundaries)
+    diff_separator = f"DIFF_BOUNDARY_{uuid.uuid4().hex}"
+
     # Build user prompt from diff and clues
     input_template = Template(default.get("input", ""))
     input_data = clue_parser(input)
+    # Inject the random separator into the template context
+    input_data["separator"] = diff_separator
     user_prompt = input_template.render(**input_data)
 
     # Add emoji guidelines to system prompt if enabled, or explicit no-emoji instruction if disabled
