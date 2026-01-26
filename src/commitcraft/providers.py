@@ -511,28 +511,26 @@ class AnthropicProvider(LLMProvider):
         try:
             client = anthropic.Anthropic(api_key=self.api_key)
 
-            # Count system prompt tokens
-            system_response = client.messages.count_tokens(
+            # Count total tokens with both system and user prompts
+            total_response = client.messages.count_tokens(
                 model=self.model,
                 system=system_prompt,
-                messages=[
-                    {"role": "user", "content": ""}
-                ],  # Empty message to count only system
-            )
-            system_tokens = system_response.input_tokens
-
-            # Count user prompt tokens
-            user_response = client.messages.count_tokens(
-                model=self.model,
-                system="",  # Empty system to count only user message
                 messages=[{"role": "user", "content": user_prompt}],
             )
-            user_tokens = user_response.input_tokens
+            total_tokens = total_response.input_tokens
+
+            # For breakdown, use tiktoken as fallback since Anthropic API
+            # no longer allows empty content for separate counting
+            import tiktoken
+
+            enc = tiktoken.get_encoding("cl100k_base")
+            system_tokens = len(enc.encode(system_prompt))
+            user_tokens = len(enc.encode(user_prompt))
 
             result = {
-                "token_count": system_tokens + user_tokens,
-                "system_prompt_tokens": system_tokens,
-                "user_prompt_tokens": user_tokens,
+                "token_count": total_tokens,  # Use accurate Anthropic total
+                "system_prompt_tokens": system_tokens,  # Estimated breakdown
+                "user_prompt_tokens": user_tokens,  # Estimated breakdown
                 "model": self.model,
                 "provider": self.nickname if self.nickname else self.provider_name,
             }
