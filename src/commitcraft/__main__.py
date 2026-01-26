@@ -445,6 +445,7 @@ def main(
         Optional[str],
         typer.Option(
             rich_help_panel="Commit Clues",
+            envvar="COMMITCRAFT_CLUE",
             help="Gives the model a custom clue of the current commit",
         ),
     ] = None,
@@ -1636,6 +1637,11 @@ def envvars():
         "Enable two-step confirmation mode",
         "Shows dry-run before generating",
     )
+    table.add_row(
+        "COMMITCRAFT_CLUE",
+        "Custom CommitClue for personalized context",
+        "e.g., 'This fixes the login issue' or 'Performance optimization'",
+    )
 
     # Output & Display
     table.add_section()
@@ -1679,7 +1685,7 @@ def envvars():
         "or export them in your shell.[/dim]"
     )
     console.print(
-        "[dim]📖 For more details, see: [cyan]https://github.com/nebius-group/CommitCraft#environment-variables[/cyan][/dim]"
+        "[dim]📖 For more details, see: [cyan]https://felix-pedro.github.io/CommitCraft/[/cyan][/dim]"
     )
 
 
