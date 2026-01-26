@@ -56,5 +56,6 @@ nav:
     - Contributing: contributing.md
     - Testing: testing.md
     - Code of Conduct: CONDUCT.md
+  - Future Improvements: future-improvements.md
   - Changelog: changelog.md
   - License: license.md

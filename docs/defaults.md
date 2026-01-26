@@ -91,7 +91,7 @@ Context clues for this commit:
 - Clues are treated as instructions and cannot be effectively sanitized
 - A warning is logged when using `COMMITCRAFT_CLUE` environment variable
 - Only use CommitCraft in trusted environments
-- See [Security & Best Practices](index.md#-security--best-practices) for details
+- See [Security & Best Practices](index.md#security-best-practices) for details
 
 ---
 
