@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Optional
@@ -18,6 +19,81 @@ def validate_url(url: str) -> bool:
     try:
         result = urlparse(url)
         return all([result.scheme, result.netloc])
+    except Exception:
+        return False
+
+
+def is_in_git_repo() -> bool:
+    """Check if current directory is in a git repository."""
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def is_file_gitignored(filepath: str) -> bool:
+    """
+    Check if a file is ignored by git using 'git check-ignore'.
+
+    Args:
+        filepath: Path to the file to check (relative or absolute)
+
+    Returns:
+        True if the file is gitignored, False otherwise
+    """
+    try:
+        result = subprocess.run(
+            ["git", "check-ignore", filepath],
+            capture_output=True,
+            text=True,
+        )
+        # Exit code 0 means the file is ignored
+        return result.returncode == 0
+    except FileNotFoundError:
+        # Git not installed
+        return False
+
+
+def add_to_gitignore(filepath: str, gitignore_path: Path = None) -> bool:
+    """
+    Add a file pattern to .gitignore.
+
+    Args:
+        filepath: Pattern to add to .gitignore
+        gitignore_path: Path to .gitignore file (defaults to ./.gitignore)
+
+    Returns:
+        True if successfully added, False otherwise
+    """
+    if gitignore_path is None:
+        gitignore_path = Path.cwd() / ".gitignore"
+
+    try:
+        # Read existing content
+        existing_lines = []
+        if gitignore_path.exists():
+            with open(gitignore_path, "r") as f:
+                existing_lines = f.readlines()
+
+        # Check if pattern already exists
+        pattern_with_newline = f"{filepath}\n"
+        if any(line.strip() == filepath for line in existing_lines):
+            return True  # Already exists
+
+        # Append the pattern
+        with open(gitignore_path, "a") as f:
+            # Add newline before if file doesn't end with one
+            if existing_lines and not existing_lines[-1].endswith("\n"):
+                f.write("\n")
+            f.write(pattern_with_newline)
+
+        return True
     except Exception:
         return False
 
@@ -681,6 +757,47 @@ def interactive_config():
         if save_choice != "skip":
             env_path = Path.cwd() / save_choice
 
+            # Security check: warn if .env file is not gitignored
+            if is_in_git_repo():
+                if not is_file_gitignored(save_choice):
+                    print(f"\n[bold red]⚠️  SECURITY WARNING[/bold red]")
+                    print(
+                        f"[yellow]The file '{save_choice}' is NOT in .gitignore![/yellow]"
+                    )
+                    print(
+                        "[yellow]This means your API keys could be accidentally committed to git.[/yellow]"
+                    )
+                    print(
+                        "\n[cyan]Recommendation:[/cyan] Add this file to .gitignore to protect your API keys."
+                    )
+
+                    if typer.confirm(
+                        f"Do you want to add '{save_choice}' to .gitignore now?",
+                        default=True,
+                    ):
+                        if add_to_gitignore(save_choice):
+                            print(
+                                f"[green]✓ Added '{save_choice}' to .gitignore[/green]"
+                            )
+                        else:
+                            print(
+                                f"[red]✗ Failed to add '{save_choice}' to .gitignore[/red]"
+                            )
+                            print(
+                                f"[yellow]Please manually add '{save_choice}' to your .gitignore file.[/yellow]"
+                            )
+                    else:
+                        print(
+                            f"\n[bold yellow]⚠️  Remember to add '{save_choice}' to .gitignore manually![/bold yellow]"
+                        )
+                        print(
+                            "[dim]You can do this by running: echo '{save_choice}' >> .gitignore[/dim]".format(
+                                save_choice=save_choice
+                            )
+                        )
+                else:
+                    print(f"[dim]✓ '{save_choice}' is already in .gitignore[/dim]")
+
             existing_lines = []
             if env_path.exists():
                 with open(env_path, "r") as f:
@@ -699,7 +816,7 @@ def interactive_config():
                             f"[yellow]Key {k} already exists in {save_choice}, skipping.[/yellow]"
                         )
 
-            print(f"[green]API keys process finished for {env_path}[/green]")
+            print(f"[green]API keys saved to {env_path}[/green]")
     else:
         print("[yellow]No API keys to save.[/yellow]")
 
