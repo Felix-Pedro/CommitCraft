@@ -1,0 +1,24 @@
+[context]
+commit_guidelines = "\n    - Never ask for folow-up questions.\n    - Don't ask quetions.\n    - Don't talk about yourself.\n    - Be concise and clear.\n    - Be informative.\n    - Don't explain row by row just the global goal of the changes.\n    - Avoid unecessary details and long explanations.\n    - Use action verbs.\n    - Use bullet points in the body if there are many changes\n    - Do not talk about the hashes.\n    - Create concise and comprehensive commit messages.\n    - Be direct about what changed and why. Focous on what.\n    - Give a small summary of what has changed and how it may afect the rest of the project.\n    - Do not return any explanation other then the commit message itself.\n    - If there are many changes focous on the main ones.\n    - The first row shall be te title of your message, so make it simple and informative.\n    - Do not introduce your message!\n    "
+
+[models]
+provider = "ollama"
+host = "https://ollama.mydomain"
+model = "qwen3-coder:latest"
+
+[emoji]
+emoji_convention = "simple"
+emoji_steps = "single"
+
+[providers.litellm]
+provider = "openai_compatible"
+host = "https://litellm.mydomain/"
+model = "gemini/gemini-2.5-flash"
+
+[providers.google]
+provider = "google"
+model = "gemini-2.5-pro"
+
+[providers.anthropic]
+provider = "anthropic"
+model = "claude-haiku-4-5-20251001"
