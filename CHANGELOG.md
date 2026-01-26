@@ -7,6 +7,10 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ## [unreleased]
 
+---
+
+## [1.1.0] - 2026-01-26
+
 ### Changed
 
 - **Documentation - 2-Step Emoji Clarification**: Updated documentation to clearly indicate that the 2-step emoji system (`emoji_steps = "2-step"`) is planned for version 1.2 but not yet fully implemented. Currently, only `"single"` (default) and `false` emoji modes are functional. The 2-step mode is defined in code but the implementation logic is pending.
@@ -22,7 +26,6 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - **Combined Debug and Dry-Run Modes**: The `--debug-prompt` and `--dry-run` flags can now be used together. When combined, the output includes both token usage statistics and the full system/user prompts, making it easier to debug prompt construction while reviewing token consumption. Previously, these flags were mutually exclusive. Use the `--compact` flag to show prompts only in the table (truncated) without full output below, which is useful for demos and presentations.
 - **No-Emoji Flag**: Added `--no-emoji` CLI flag and `COMMITCRAFT_NO_EMOJI` environment variable to disable emoji in commit messages for a single invocation, overriding configuration file settings. When emojis are disabled, the model receives an explicit instruction to NOT use any emojis in the output, ensuring plain text commit messages.
 - **Automatic Update Checking**: CommitCraft now automatically checks for new versions weekly (opt-out by default). Update notifications are displayed after successful commit message generation and when installing/updating git hooks. The check uses PyPI's public API with a 2-second timeout and caches results to avoid excessive network calls. Users are notified about available updates with clear instructions for updating via `uv tool upgrade commitcraft` or `pipx upgrade commitcraft`. Checking can be disabled by adding `[updates] check_enabled = false` to your config file, and the check interval is configurable (default: 7 days). This helps ensure users receive important security patches and new features.
-
 - **Two-Step Confirmation Mode**: Added `--confirm` flag and `COMMITCRAFT_CONFIRM` environment variable to enable a two-step process: (1) show dry-run statistics and configuration preview, then (2) prompt for user confirmation before generating the commit message. This is particularly useful when using git hooks to review token usage and settings before making API calls. Can be enabled via CLI flag or environment variable, and is supported in both interactive and non-interactive hook modes via `CommitCraft hook --confirm`.
 - **Anthropic Provider**: Added native support for Anthropic's Claude models with automatic token counting via Anthropic's `count_tokens()` API. Includes intelligent Claude model detection when using OpenAI-compatible routers (LiteLLM, OpenRouter) - automatically uses native Anthropic token counting for accurate estimates. Interactive config wizard dynamically fetches available models from Anthropic API. Supports all Claude models including Claude Opus 4.5, Haiku 4.5, and Sonnet 4.5. Requires `ANTHROPIC_API_KEY` environment variable.
 - **Enhanced Dry Run Output**: Dry run mode (`--dry-run`) now displays provider name and host URL for better transparency. When using named provider profiles from `[providers]` config, shows the user-defined nickname (e.g., "litellm") instead of the generic provider type (e.g., "openai_compatible").
@@ -145,7 +148,8 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 - GitMoji prompt.
 - Default system prompt.
 
-[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Felix-Pedro/CommitCraft/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/Felix-Pedro/CommitCraft/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Felix-Pedro/CommitCraft/releases/tag/v0.1.0
