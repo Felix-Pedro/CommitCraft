@@ -74,6 +74,33 @@ emoji_model = "gpt-4o-mini"  # Optional: use different model for emoji selection
 - Handle emoji injection into existing message
 - Update tests for two-step flow
 
+### Rich TUI Config Interface
+**Status**: Planned for v1.2
+**Complexity**: Medium
+**Time Estimate**: 3-4 weeks
+
+Transform the `config` subcommand from simple text prompts to a modern, beautiful terminal UI with arrow key navigation, visual menus, and interactive wizards - similar to Claude CLI, Gemini CLI, and other modern CLI tools.
+
+**Planned Features**:
+- Arrow key navigation for provider/model selection
+- Visual selection menus with descriptions
+- Input validation with inline error messages
+- Spinner animations for API calls
+- Step-by-step wizard flow with progress indicators
+- Configuration preview with syntax highlighting
+
+**Implementation Approach**:
+- Start with **InquirerPy** for quick implementation
+- Combine with existing Rich library for output and spinners
+- Option to migrate to **Textual** later for more advanced TUI features
+
+**Benefits**:
+- Faster, more intuitive setup process
+- Reduced configuration errors
+- Professional, modern user experience
+- Better discoverability of features
+
+> **Note for Contributors**: Detailed implementation specification available in `cache/.aimd/tui-config-implementation-spec.md`
 
 ### AUR (Arch User Repository) Package
 **Status**: Planning complete, awaiting implementation
