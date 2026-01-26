@@ -760,7 +760,7 @@ def interactive_config():
             # Security check: warn if .env file is not gitignored
             if is_in_git_repo():
                 if not is_file_gitignored(save_choice):
-                    print(f"\n[bold red]⚠️  SECURITY WARNING[/bold red]")
+                    print("\n[bold red]⚠️  SECURITY WARNING[/bold red]")
                     print(
                         f"[yellow]The file '{save_choice}' is NOT in .gitignore![/yellow]"
                     )

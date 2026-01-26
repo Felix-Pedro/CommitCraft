@@ -16,6 +16,7 @@ default = {
     - Do not return any explanation other than the commit message itself.
     - If there are many changes focus on the main ones.
     - The first row shall be the title of your message, so make it simple and informative.
+    - After the title, there must always be an empty line before any detailed description or body content.
     - Do not introduce your message!
     """,
     "emoji_guidelines": {
