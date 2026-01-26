@@ -25,8 +25,7 @@ from commitcraft import (
     LModel,
     LModelOptions,
     commit_craft,
-    filter_diff,
-    get_diff,
+    get_filtered_diff,
 )
 
 from .config_handler import interactive_config
@@ -523,9 +522,6 @@ def main(
         # Load CommitCraft.env if it exists (overrides .env)
         load_dotenv(os.path.join(os.getcwd(), "CommitCraft.env"))
 
-        # Get the git diff
-        diff = get_diff(amend=amend)
-
         # Build ignore patterns: defaults + .commitcraft/.ignore + CLI --ignore
         ignored_patterns = list(DEFAULT_IGNORE_PATTERNS)
         if os.path.exists("./.commitcraft/.ignore"):
@@ -539,7 +535,9 @@ def main(
                 )
         if ignore:
             ignored_patterns.extend([pattern.strip() for pattern in ignore.split(",")])
-        diff = filter_diff(diff, list(set(ignored_patterns)))
+
+        # Get the filtered git diff using secure list-then-diff approach
+        diff = get_filtered_diff(list(set(ignored_patterns)), amend=amend)
 
         # Validate that there are changes to commit
         if not diff or not diff.strip():

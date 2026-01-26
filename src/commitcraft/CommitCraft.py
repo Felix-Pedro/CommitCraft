@@ -113,8 +113,108 @@ def matches_pattern(file_path: str, ignored_patterns: list[str]) -> bool:
     return any(fnmatch.fnmatch(file_path, pattern) for pattern in ignored_patterns)
 
 
+def get_filtered_diff(ignored_patterns: list[str], amend: bool = False) -> str:
+    """
+    Securely retrieve and filter git diff by listing files first, then requesting
+    diffs only for allowed files. This approach prevents command injection via
+    malicious filenames and handles edge cases (spaces, special chars) correctly.
+
+    Security: Uses git's -z (NULL-separated) output to avoid ambiguity in filenames,
+    and passes file paths as list arguments (not shell strings) to prevent injection.
+
+    Args:
+        ignored_patterns: List of glob patterns for files to exclude
+        amend: If True, generate diff for amending the last commit
+
+    Returns:
+        Filtered diff output with excluded files removed
+
+    Raises:
+        RuntimeError: If git command fails or git is not installed
+    """
+    try:
+        # Step 1: Determine the base comparison target
+        if amend:
+            # Check if HEAD exists
+            try:
+                subprocess.run(
+                    ["git", "rev-parse", "--verify", "HEAD"],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                raise RuntimeError("Cannot amend: No HEAD commit found.")
+
+            # Try to get HEAD^ (parent)
+            try:
+                subprocess.run(
+                    ["git", "rev-parse", "--verify", "HEAD^"],
+                    check=True,
+                    capture_output=True,
+                )
+                # HEAD has a parent, use it as base
+                base = "HEAD^"
+            except subprocess.CalledProcessError:
+                # HEAD is root commit, use empty tree
+                base = GIT_EMPTY_TREE_HASH
+
+            # Get list of staged files using NULL separator for safety
+            files_cmd = ["git", "diff", "--cached", base, "--name-only", "-z"]
+        else:
+            # Get list of staged files using NULL separator for safety
+            files_cmd = ["git", "diff", "--staged", "--name-only", "-z"]
+
+        files_result = subprocess.run(
+            files_cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Step 2: Split on NULL bytes and filter out empty strings
+        all_files = [f for f in files_result.stdout.split("\0") if f]
+
+        # Step 3: Filter files based on ignore patterns
+        allowed_files = [
+            f for f in all_files if not matches_pattern(f, ignored_patterns)
+        ]
+
+        # Step 4: If no files remain after filtering, return empty string
+        if not allowed_files:
+            return ""
+
+        # Step 5: Request diff only for allowed files
+        # Use -- to separate paths from options to prevent filename-as-option injection
+        if amend:
+            diff_cmd = ["git", "diff", "--cached", base, "-M", "--"] + allowed_files
+        else:
+            diff_cmd = ["git", "diff", "--staged", "-M", "--"] + allowed_files
+
+        diff_result = subprocess.run(
+            diff_cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        return diff_result.stdout
+
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() if e.stderr else "Unknown git error"
+        raise RuntimeError(f"Git command failed: {error_msg}") from e
+    except FileNotFoundError:
+        raise RuntimeError(
+            "Git is not installed or not in PATH. Please install git to use CommitCraft."
+        ) from None
+
+
 def filter_diff(diff_output: str, ignored_patterns: list[str]) -> str:
     """
+    DEPRECATED: Legacy function for backward compatibility.
+
+    This function manually parses diff output which is vulnerable to filenames
+    with special characters. Use get_filtered_diff() instead for new code.
+
     Filter git diff output to exclude files matching ignore patterns.
 
     Parses the diff output line-by-line, identifying file boundaries using

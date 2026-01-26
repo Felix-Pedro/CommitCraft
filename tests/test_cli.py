@@ -24,20 +24,20 @@ def test_help_flag():
     assert "Generates a commit message" in strip_ansi(result.stdout)
 
 
-@patch("commitcraft.__main__.get_diff")
-def test_main_no_diff(mock_get_diff):
+@patch("commitcraft.__main__.get_filtered_diff")
+def test_main_no_diff(mock_get_filtered_diff):
     # Simulate empty diff
-    mock_get_diff.return_value = ""
+    mock_get_filtered_diff.return_value = ""
     # Passing no args invokes main
     result = runner.invoke(app, [])
     # Should exit cleanly (0) because it catches empty diff
     assert result.exit_code == 0
 
 
-@patch("commitcraft.__main__.get_diff")
+@patch("commitcraft.__main__.get_filtered_diff")
 @patch("commitcraft.__main__.commit_craft")
-def test_dry_run(mock_commit_craft, mock_get_diff):
-    mock_get_diff.return_value = "diff --git a/file b/file..."
+def test_dry_run(mock_commit_craft, mock_get_filtered_diff):
+    mock_get_filtered_diff.return_value = "diff --git a/file b/file..."
     # dry-run should return a dict with token usage stats
     mock_commit_craft.return_value = {
         "token_count": 100,
@@ -53,15 +53,13 @@ def test_dry_run(mock_commit_craft, mock_get_diff):
     assert mock_commit_craft.called
 
 
-@patch("commitcraft.__main__.get_diff")
 @patch("commitcraft.__main__.commit_craft")
 @patch("commitcraft.__main__.rotating_status")
-@patch("commitcraft.__main__.filter_diff")
-def test_clue_flags(
-    mock_filter_diff, mock_rotating_status, mock_commit_craft, mock_get_diff
-):
-    mock_get_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_filter_diff.return_value = "diff --git a/file.py b/file.py"  # Pass through
+@patch("commitcraft.__main__.get_filtered_diff")
+def test_clue_flags(mock_get_filtered_diff, mock_rotating_status, mock_commit_craft):
+    mock_get_filtered_diff.return_value = (
+        "diff --git a/file.py b/file.py"  # Return filtered diff
+    )
     mock_commit_craft.return_value = "Fix bug"
 
     # Mock rotating_status to just call the function immediately

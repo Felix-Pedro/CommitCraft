@@ -39,6 +39,7 @@ and this project adheres to (or tries to) [Semantic Versioning](https://semver.o
 
 ### Fixed
 
+- **Security - Command Injection Prevention**: Hardened diff filtering to prevent potential command injection vulnerabilities from malicious filenames containing special characters (spaces, newlines, quotes). The new implementation uses git's `-z` (NULL-separated) output for unambiguous file path parsing and passes paths as list arguments instead of shell strings. Introduced `get_filtered_diff()` function that uses a secure "list-then-diff" approach: (1) retrieves file list with `git diff --name-only -z`, (2) filters against ignore patterns, (3) requests diff only for approved files using `--` separator. The legacy `filter_diff()` function is retained for backward compatibility but marked as deprecated.
 - **Empty Diff Validation**: Added validation to prevent wasted API calls when there are no staged changes or all changes are filtered out by ignore patterns. Now displays a helpful message: "No staged changes to analyze. Either there are no staged changes, or all files are ignored by the filter patterns."
 - **Pydantic v2 Compatibility**: Updated `model_dump()` and `ConfigDict` usage to address deprecation warnings when running with Pydantic v2.
 - **Git Error Handling**: Added comprehensive error handling for `get_diff()` function. Now properly catches and reports errors when git is not installed or when git commands fail (e.g., not in a git repository).
